@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:go_router/go_router.dart';
+import 'package:uids_io_sdk_flutter/configuration.dart';
 import 'package:uids_io_sdk_flutter/models/aud_model.dart';
 import 'package:uids_io_sdk_flutter/models/auth_response_model.dart';
 import 'package:uids_io_sdk_flutter/models/auth_token_model.dart';
@@ -15,7 +16,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class GmailSSO {
   static Dio _dio = Dio();
-  static String apiUrl = 'https://auth1.3u.gg';
   final ConfigurationService _configurationService = ConfigurationService();
   late final GoogleSignIn _googleSignIn;
   String? clientId_shared_preferences;
@@ -175,7 +175,7 @@ class GmailSSO {
       final model = AzureTokenInputModel(
           accessToken: accessToken, idpName: idpName_shared_preferences ?? '');
       final response = await _dio.post(
-        '$apiUrl/auth',
+        '${Configuration.apiUrl}/auth',
         data: model.toJson(),
       );
 
@@ -228,7 +228,7 @@ class GmailSSO {
           refreshToken: refreshToken,
           deviceId: deviceId);
       final response = await _dio.post(
-        '$apiUrl/aud',
+        '${Configuration.apiUrl}/aud',
         data: model.toJson(),
       );
 
@@ -239,6 +239,7 @@ class GmailSSO {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('JWT_Token', responseData.token);
         await prefs.setString('Refresh_Token', responseData.refreshToken);
+        await prefs.setString('Username', username);
         context.goNamed('/');
       } else {
         print('Backend error: ${response.statusCode} ${response.data}');

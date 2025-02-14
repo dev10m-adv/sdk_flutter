@@ -37,29 +37,29 @@ class AuthButtons extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () {}, // ❌ No implementation for GitHub
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              side: const BorderSide(color: Colors.grey),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ConditionalImageWidget(imagePath: "assets/images/github_icon.png"),
-                const SizedBox(width: 10),
-                const Text("Sign in with GitHub",
-                    style: TextStyle(fontSize: 18, color: Colors.black)),
-              ],
-            ),
-          ),
-        ),
+        // const SizedBox(height: 20),
+        // SizedBox(
+        //   width: double.infinity,
+        //   child: OutlinedButton(
+        //     onPressed: () {}, // ❌ No implementation for GitHub
+        //     style: OutlinedButton.styleFrom(
+        //       padding: const EdgeInsets.symmetric(vertical: 15),
+        //       shape: RoundedRectangleBorder(
+        //         borderRadius: BorderRadius.circular(10),
+        //       ),
+        //       side: const BorderSide(color: Colors.grey),
+        //     ),
+        //     child: Row(
+        //       mainAxisAlignment: MainAxisAlignment.center,
+        //       children: [
+        //         ConditionalImageWidget(imagePath: "assets/images/github_icon.png"),
+        //         const SizedBox(width: 10),
+        //         const Text("Sign in with GitHub",
+        //             style: TextStyle(fontSize: 18, color: Colors.black)),
+        //       ],
+        //     ),
+        //   ),
+        // ),
         // const SizedBox(height: 20),
         // SizedBox(
         //   width: double.infinity,

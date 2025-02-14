@@ -4,10 +4,11 @@ import 'package:dio/dio.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uids_io_sdk_flutter/configuration.dart';
 
 class ConfigurationService {
   final Dio _dio = Dio();
-  final String apiUrl = 'https://auth1.3u.gg';
+  final String apiUrl = Configuration.apiUrl;
   Future<void> registerDeviceData() async {
     final ConfigurationService _configurationService = ConfigurationService();
     final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
