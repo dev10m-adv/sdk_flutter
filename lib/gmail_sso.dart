@@ -184,6 +184,7 @@ class GmailSSO {
         final responseData = AuthResponseModel.fromJson(response.data);
         print('ErrorDetails: ${responseData.errorDetails}');
         print('Username: ${responseData.username}');
+        print('idpname: ${responseData.idpname_backend}');
         print('Entities: ${responseData.entities}');
         print('Entities Length: ${responseData.entities.length}');
         if (responseData.entities.length == 1) {
@@ -193,8 +194,10 @@ class GmailSSO {
           final prefs = await SharedPreferences.getInstance();
           String jsonString = jsonEncode(response.data);
           await prefs.setString('Entities_List', jsonString);
+          await prefs.setString('idpname_backend', responseData.idpname_backend);
           getJwtFromBackend(
               responseData.username,
+              responseData.idpname_backend,
               entityDta.tenant,
               entityDta.refreshToken,
               deviceId_shared_preferences ?? '',
@@ -219,11 +222,12 @@ class GmailSSO {
     }
   }
 
-  static Future<void> getJwtFromBackend(String username, String tenant,
+  static Future<void> getJwtFromBackend(String username,String idpName, String tenant,
       String refreshToken, String deviceId, BuildContext context) async {
     try {
       final model = AudModel(
           username: username,
+          idpname_backend: idpName,
           tenant: tenant,
           refreshToken: refreshToken,
           deviceId: deviceId);

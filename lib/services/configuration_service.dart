@@ -79,28 +79,64 @@ class ConfigurationService {
       if (response.statusCode == 200) {
         print('Device registered successfully: ${response.data}');
         final responseData = response.data;
+
         if (responseData['IsSuccess'] == true) {
           final configurations = responseData['Configurations'];
           if (configurations != null && configurations.isNotEmpty) {
-            final config = configurations[0];
-            final clientConfig = config['appidpclientconfiguration'];
-            final clientId = clientConfig['CLIENT_ID'];
-            final idpName = config['idpname'];
-            final deviceId = responseData['DeviceId'];
+            // Find configuration where idpname is "Gmail"
+            final config = configurations.firstWhere(
+              (config) => config['idpname'] == 'Gmail',
+              orElse: () => null, // Avoids crash if no match is found
+            );
 
-            print('Client Id: $clientId');
-            print('IDP Name: $idpName');
-            print('Device ID: $deviceId');
+            if (config != null) {
+              final clientConfig = config['appidpclientconfiguration'];
+              final clientId = clientConfig?['CLIENT_ID'] ?? '';
+              final idpName = config['idpname'];
+              final deviceId = responseData['DeviceId'];
 
-            // Store values in SharedPreferences
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('clientId', clientId);
-            await prefs.setString('idpName', idpName);
-            await prefs.setString('deviceId', deviceId.toString());
+              print('Client Id: $clientId');
+              print('IDP Name: $idpName');
+              print('Device ID: $deviceId');
+
+              // Store values in SharedPreferences
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('clientId', clientId);
+              await prefs.setString('idpName', idpName);
+              await prefs.setString('deviceId', deviceId.toString());
+            } else {
+              print('No configuration found for Gmail');
+            }
           }
         }
-      } else {
-        print('Failed to register device: ${response.statusCode} ${response.data}');
+      }
+      // if (response.statusCode == 200) {
+      //   print('Device registered successfully: ${response.data}');
+      //   final responseData = response.data;
+      //   if (responseData['IsSuccess'] == true) {
+      //     final configurations = responseData['Configurations'];
+      //     if (configurations != null && configurations.isNotEmpty) {
+      //       final config = configurations[0];
+      //       final clientConfig = config['appidpclientconfiguration'];
+      //       final clientId = clientConfig['CLIENT_ID']??'';
+      //       final idpName = config['idpname'];
+      //       final deviceId = responseData['DeviceId'];
+
+      //       print('Client Id: $clientId');
+      //       print('IDP Name: $idpName');
+      //       print('Device ID: $deviceId');
+
+      //       // Store values in SharedPreferences
+      //       final prefs = await SharedPreferences.getInstance();
+      //       await prefs.setString('clientId', clientId);
+      //       await prefs.setString('idpName', idpName);
+      //       await prefs.setString('deviceId', deviceId.toString());
+      //     }
+      //   }
+      // }
+      else {
+        print(
+            'Failed to register device: ${response.statusCode} ${response.data}');
       }
     } catch (e) {
       print('Error registering device: $e');

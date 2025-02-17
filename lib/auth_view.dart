@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:uids_io_sdk_flutter/gmail_sso.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uids_io_sdk_flutter/auth.dart';
 import 'auth_buttons.dart';
 
 final GlobalKey<AuthScreenState> globalKey = GlobalKey<AuthScreenState>();
@@ -11,28 +12,15 @@ class AuthScreen extends StatefulWidget {
   AuthScreenState createState() => AuthScreenState();
 }
 
-
 class AuthScreenState extends State<AuthScreen> {
   String currentScreen = "login";
   List<String> entityOptions = [];
   String username = "";
   String deviceId = "";
   List<String> refreshTokens = [];
-  void switchScreen(String screen, {List<String>? options, String? user, String? device, List<String>? tokens}) {
+  void switchScreen(String screen) {
     setState(() {
       currentScreen = screen;
-      if (options != null) {
-        entityOptions = options;
-      }
-      if (user != null) {
-        username = user;
-      }
-      if (device != null) {
-        deviceId = device;
-      }
-      if (tokens != null) {
-        refreshTokens = tokens;
-      }
     });
   }
 
@@ -52,7 +40,7 @@ class AuthScreenState extends State<AuthScreen> {
     );
   }
 
-    Widget _getScreen() {
+  Widget _getScreen() {
     switch (currentScreen) {
       case "login":
         return LoginScreen(switchScreen: switchScreen);
@@ -60,14 +48,6 @@ class AuthScreenState extends State<AuthScreen> {
         return RegisterScreen(switchScreen: switchScreen);
       case "otp":
         return OtpScreen(switchScreen: switchScreen);
-      case "selectEntity":
-        return SelectEntityScreen(
-          switchScreen: switchScreen,
-          tenants: entityOptions,
-          username: username,
-          deviceId: deviceId,
-          refreshTokens: refreshTokens,
-        );
       default:
         return Container();
     }
@@ -87,66 +67,7 @@ class LoginScreen extends StatelessWidget {
           style: TextStyle(
               fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black),
         ),
-        const SizedBox(height: 40),
-        TextField(
-          decoration: InputDecoration(
-            labelText: "Email",
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            prefixIcon: const Icon(Icons.email, color: Colors.grey),
-          ),
-        ),
-        const SizedBox(height: 20),
-        TextField(
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: "Password",
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            prefixIcon: const Icon(Icons.lock, color: Colors.grey),
-          ),
-        ),
-        const SizedBox(height: 30),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => switchScreen("otp"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text("Login",
-                style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text("Don't have an account? ",
-                style: TextStyle(color: Colors.grey)),
-            TextButton(
-              onPressed: () => switchScreen("register"),
-              child: const Text("Sign Up",
-                  style: TextStyle(
-                      color: Colors.black, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        // Divider with "OR" text
-        Row(
-          children: [
-            const Expanded(child: Divider(color: Colors.grey)),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text("OR", style: TextStyle(color: Colors.grey)),
-            ),
-            const Expanded(child: Divider(color: Colors.grey)),
-          ],
-        ),
-        const SizedBox(height: 20),
-        // Auth Buttons (Google & Facebook)
+        UsernameAndPassword(switchScreen: switchScreen),
         AuthButtons(),
       ],
     );
@@ -159,6 +80,37 @@ class RegisterScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController _usernameController = TextEditingController();
+    final TextEditingController _emailController = TextEditingController();
+    final TextEditingController _passwordController = TextEditingController();
+
+    // Register function
+    void _register() async {
+      final String username = _usernameController.text;
+      final String email = _emailController.text;
+      final String password = _passwordController.text;
+
+      // Validate fields
+      if (username.isEmpty || email.isEmpty || password.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill in all fields')),
+        );
+        return;
+      }
+
+      try {
+        await registerUser(username, email, password, context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User registered successfully')),
+        );
+        // switchScreen("otp"); // After successful registration, go to OTP screen
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())), // Show the exact error message
+        );
+      }
+    }
+
     return Column(
       children: [
         const Text("Register",
@@ -168,14 +120,16 @@ class RegisterScreen extends StatelessWidget {
                 color: Colors.black)),
         const SizedBox(height: 40),
         TextField(
+          controller: _usernameController,
           decoration: InputDecoration(
-            labelText: "Full Name",
+            labelText: "Username",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             prefixIcon: const Icon(Icons.person, color: Colors.grey),
           ),
         ),
         const SizedBox(height: 20),
         TextField(
+          controller: _emailController,
           decoration: InputDecoration(
             labelText: "Email",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -184,6 +138,7 @@ class RegisterScreen extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         TextField(
+          controller: _passwordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: "Password",
@@ -195,7 +150,8 @@ class RegisterScreen extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () => switchScreen("otp"),
+            onPressed: _register,
+            // onPressed: () => switchScreen("otp"),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
               padding: const EdgeInsets.symmetric(vertical: 15),
@@ -226,12 +182,32 @@ class RegisterScreen extends StatelessWidget {
 }
 
 class OtpScreen extends StatelessWidget {
-  // final Function(String, {List<String>? options}) switchScreen;
   final Function(String) switchScreen;
   const OtpScreen({required this.switchScreen, super.key});
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController _otpController = TextEditingController();
+    void _verifyOtp() async {
+      final String otp = _otpController.text;
+
+      if (otp.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter otp')),
+        );
+        return;
+      }
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await verifyOtp(otp, prefs.getString('opt_access_token')??'', context);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())), // Show the exact error message
+        );
+      }
+    }
+
     return Column(
       children: [
         const Text("Verify OTP",
@@ -241,6 +217,7 @@ class OtpScreen extends StatelessWidget {
                 color: Colors.black)),
         const SizedBox(height: 40),
         TextField(
+          controller: _otpController,
           decoration: InputDecoration(
             labelText: "Enter OTP",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -253,14 +230,7 @@ class OtpScreen extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () {
-            //   switchScreen("selectEntity", options: [
-            //   "Option 1",
-            //   "Option 2",
-            //   "Option 3",
-            //   "Option 4",
-            // ]); // Change screen here
-            },
+            onPressed: _verifyOtp,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
               padding: const EdgeInsets.symmetric(vertical: 15),
@@ -273,121 +243,128 @@ class OtpScreen extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         // Resend OTP Text
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text("Didn't receive the OTP? ",
-                style: TextStyle(color: Colors.grey)),
-            TextButton(
-              onPressed: () {
-                // Add resend OTP logic here
-              },
-              child: const Text(
-                "Resend OTP",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
+        // Row(
+        //   mainAxisAlignment: MainAxisAlignment.center,
+        //   children: [
+        //     const Text("Didn't receive the OTP? ",
+        //         style: TextStyle(color: Colors.grey)),
+        //     TextButton(
+        //       onPressed: () {
+        //         // Add resend OTP logic here
+        //       },
+        //       child: const Text(
+        //         "Resend OTP",
+        //         style: TextStyle(
+        //           color: Colors.black,
+        //           fontWeight: FontWeight.bold,
+        //         ),
+        //       ),
+        //     ),
+        //   ],
+        // ),
       ],
     );
   }
 }
 
-class SelectEntityScreen extends StatefulWidget { 
-  final Function(String, {List<String>? options, String? user, String? device, List<String>? tokens}) switchScreen;
-  final List<String> tenants;
-  final String username;
-  final String deviceId;
-  final List<String> refreshTokens;
+class UsernameAndPassword extends StatelessWidget {
+  final Function(String) switchScreen;
 
-  const SelectEntityScreen({
-    required this.switchScreen,
-    required this.tenants,
-    required this.username,
-    required this.deviceId,
-    required this.refreshTokens,
-    super.key,
-  });
-
-  @override
-  _SelectEntityScreenState createState() => _SelectEntityScreenState();
-}
-
-class _SelectEntityScreenState extends State<SelectEntityScreen> {
-  String? selectedTenant;
+  const UsernameAndPassword({required this.switchScreen, super.key});
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController _emailController = TextEditingController();
+    final TextEditingController _passwordController = TextEditingController();
+    void _login() async {
+      final String email = _emailController.text;
+      final String password = _passwordController.text;
+
+      if (email.isEmpty || password.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter both email and password')),
+        );
+        return;
+      }
+
+      try {
+        await loginWithCredentials(email, password);
+        switchScreen("otp");
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())), // Show the exact error message
+        );
+      }
+    }
+
     return Column(
       children: [
-        const Text("Select Entity",
-            style: TextStyle(
-                fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black)),
+        const SizedBox(height: 40),
+        // Email input field
+        TextField(
+          controller: _emailController,
+          decoration: InputDecoration(
+            labelText: "Email",
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            prefixIcon: const Icon(Icons.email, color: Colors.grey),
+          ),
+        ),
         const SizedBox(height: 20),
-        ...widget.tenants.map((tenant) => buildSelectionBox(tenant)).toList(),
-
+        // Password input field
+        TextField(
+          controller: _passwordController,
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: "Password",
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+          ),
+        ),
         const SizedBox(height: 30),
-
-        // Next Button
+        // Login button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: selectedTenant != null
-                ? () {
-                    int index = widget.tenants.indexOf(selectedTenant!);
-                    String selectedRefreshToken = widget.refreshTokens[index];
-                    GmailSSO.getJwtFromBackend(
-                      widget.username,
-                      selectedTenant!,
-                      selectedRefreshToken,
-                      widget.deviceId,context
-                    );
-                  }
-                : null,
+            onPressed: _login,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
               padding: const EdgeInsets.symmetric(vertical: 15),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+                  borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text("Next",
+            child: const Text("Login",
                 style: TextStyle(fontSize: 18, color: Colors.white)),
           ),
         ),
-      ],
-    );
-  }
-
-  // Selection Box Widget
-  Widget buildSelectionBox(String tenant) {
-    bool isSelected = selectedTenant == tenant;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedTenant = tenant;
-        });
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(15),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.grey : Colors.white,
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(10),
+        const SizedBox(height: 20),
+        // Sign up link
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text("Don't have an account? ",
+                style: TextStyle(color: Colors.grey)),
+            TextButton(
+              onPressed: () => switchScreen("register"),
+              child: const Text("Sign Up",
+                  style: TextStyle(
+                      color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
-        child: Text(tenant,
-            style: TextStyle(
-              fontSize: 18,
-              color: isSelected ? Colors.white : Colors.black,
-              fontWeight: FontWeight.bold,
-            )),
-      ),
+        const SizedBox(height: 20),
+        // Divider with "OR" text
+        Row(
+          children: [
+            const Expanded(child: Divider(color: Colors.grey)),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Text("OR", style: TextStyle(color: Colors.grey)),
+            ),
+            const Expanded(child: Divider(color: Colors.grey)),
+          ],
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 }
