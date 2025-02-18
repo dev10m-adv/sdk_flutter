@@ -12,7 +12,7 @@ class PK {
   static Future<void> _initializeIfNeeded() async {
     if (!_isInitialized) {
       final FlutterSecureStorage secureStorage = FlutterSecureStorage();
-      String? deviceIdStr = await secureStorage.read(key: "deviceId");
+      String? deviceIdStr = await secureStorage.read(key: "DeviceId");
       // final SharedPreferences prefs = await SharedPreferences.getInstance();
       // String? deviceIdStr = prefs.getString('deviceId');
       

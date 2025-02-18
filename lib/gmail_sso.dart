@@ -6,7 +6,6 @@ import 'package:uids_io_sdk_flutter/models/aud_model.dart';
 import 'package:uids_io_sdk_flutter/models/auth_response_model.dart';
 import 'package:uids_io_sdk_flutter/models/auth_token_model.dart';
 import 'package:uids_io_sdk_flutter/models/azure_token_input_model.dart';
-import 'package:uids_io_sdk_flutter/services/configuration_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart'; // For `kIsWeb`
 import 'package:dio/dio.dart';
@@ -16,7 +15,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class GmailSSO {
   static Dio _dio = Dio();
-  final ConfigurationService _configurationService = ConfigurationService();
   late final GoogleSignIn _googleSignIn;
   String? clientId_shared_preferences;
   String? idpName_shared_preferences;
@@ -26,27 +24,27 @@ class GmailSSO {
     _initialize();
   }
   Future<void> _initialize() async {
-    await _registerDeviceData();
     await _initializeGoogleSignIn();
-  }
-
-  Future<void> _registerDeviceData() async {
-    try {
-      await _configurationService.registerDeviceData();
-    } catch (e) {
-      print('Error during device registration: $e');
-    }
   }
 
   Future<void> _initializeGoogleSignIn() async {
     final FlutterSecureStorage secureStorage = FlutterSecureStorage();
-    clientId_shared_preferences = await secureStorage.read(key: "clientId");
-    idpName_shared_preferences = await secureStorage.read(key: "idpName");
-    deviceId_shared_preferences = await secureStorage.read(key: "deviceId");
+    final confString = await secureStorage.read(key: 'Configurations');
+    List<dynamic> conf = jsonDecode(confString!);
+    final config = conf.firstWhere(
+      (config) => config['idpname'] == 'Gmail',
+      orElse: () => null, // Avoids crash if no match is found
+    );
 
-    print('Retrieved Client ID: $clientId_shared_preferences');
-    print('Retrieved IDP Name: $idpName_shared_preferences');
-    print('Retrieved Device ID: $deviceId_shared_preferences');
+    if (config != null) {
+      final clientConfig = config['appidpclientconfiguration'];
+      final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+      clientId_shared_preferences = clientConfig?['CLIENT_ID'] ?? '';
+      idpName_shared_preferences = config['idpname'];
+      deviceId_shared_preferences = await secureStorage.read(key: "DeviceId");
+    } else {
+      print('No configuration found for Gmail');
+    }
 
     // Initialize Google Sign-In instances
     _googleSignIn = GoogleSignIn(
@@ -194,7 +192,8 @@ class GmailSSO {
           final FlutterSecureStorage secureStorage = FlutterSecureStorage();
           String jsonString = jsonEncode(response.data);
           await secureStorage.write(key: "Entities_List", value: jsonString);
-          await secureStorage.write(key: "idpname_backend", value: responseData.idpname_backend);
+          await secureStorage.write(
+              key: "idpname_backend", value: responseData.idpname_backend);
           getJwtFromBackend(
               responseData.username,
               responseData.idpname_backend,
@@ -222,8 +221,13 @@ class GmailSSO {
     }
   }
 
-  static Future<void> getJwtFromBackend(String username,String idpName, String tenant,
-      String refreshToken, String deviceId, BuildContext context) async {
+  static Future<void> getJwtFromBackend(
+      String username,
+      String idpName,
+      String tenant,
+      String refreshToken,
+      String deviceId,
+      BuildContext context) async {
     try {
       final model = AudModel(
           username: username,
@@ -242,7 +246,8 @@ class GmailSSO {
         print('RefreshToken: ${responseData.refreshToken}');
         final FlutterSecureStorage secureStorage = FlutterSecureStorage();
         await secureStorage.write(key: "JWT_Token", value: responseData.token);
-        await secureStorage.write(key: "Refresh_Token", value: responseData.refreshToken);
+        await secureStorage.write(
+            key: "Refresh_Token", value: responseData.refreshToken);
         await secureStorage.write(key: "Username", value: username);
         context.goNamed('/');
       } else {

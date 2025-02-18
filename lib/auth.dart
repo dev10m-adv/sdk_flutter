@@ -200,7 +200,7 @@ Future<void> verifyOtp(
         String jsonString = jsonEncode(response.data);
         await secureStorage.write(key: "Entities_List", value: jsonString);
         await secureStorage.write(key: "idpname_backend", value: responseData.idpname_backend);
-        String? deviceId = await secureStorage.read(key: "deviceId");
+        String? deviceId = await secureStorage.read(key: "DeviceId");
         GmailSSO.getJwtFromBackend(responseData.username,responseData.idpname_backend, entityDta.tenant,
             entityDta.refreshToken, deviceId ?? '', context);
       } else {
@@ -208,6 +208,7 @@ Future<void> verifyOtp(
         String jsonString = jsonEncode(response.data);
         await secureStorage.write(key: "Entities_List", value: jsonString);
         await secureStorage.delete(key: "JWT_Token");
+        await secureStorage.write(key: "idpname_backend", value: responseData.idpname_backend);
         context.goNamed('/');
       }
     } else {

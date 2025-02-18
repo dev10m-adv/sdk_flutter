@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uids_io_sdk_flutter/auth.dart';
@@ -268,38 +270,96 @@ class OtpScreen extends StatelessWidget {
   }
 }
 
-class UsernameAndPassword extends StatelessWidget {
+class UsernameAndPassword extends StatefulWidget {
   final Function(String) switchScreen;
 
   const UsernameAndPassword({required this.switchScreen, super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final TextEditingController _emailController = TextEditingController();
-    final TextEditingController _passwordController = TextEditingController();
-    void _login() async {
-      final String email = _emailController.text;
-      final String password = _passwordController.text;
+  _UsernameAndPasswordState createState() => _UsernameAndPasswordState();
+}
 
-      if (email.isEmpty || password.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter both email and password')),
-        );
-        return;
-      }
+class _UsernameAndPasswordState extends State<UsernameAndPassword> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+  bool _isAnySSOAvailable = false;
+  bool _isEmailAvailable = false;
 
-      try {
-        await loginWithCredentials(email, password);
-        switchScreen("otp");
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())), // Show the exact error message
-        );
-      }
+  void _login() async {
+    final String email = _emailController.text;
+    final String password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter both email and password')),
+      );
+      return;
     }
 
+    try {
+      await loginWithCredentials(
+          email, password); // Assume loginWithCredentials is defined elsewhere
+      widget.switchScreen("otp");
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())), // Show the exact error message
+      );
+    }
+  }
+
+  Future<void> _loadConfig() async {
+    final confString = await secureStorage.read(key: 'Configurations');
+    if (confString != null) {
+      List<dynamic> conf = jsonDecode(confString);
+
+      final emailConfig = conf.firstWhere(
+        (config) => config['idpname'] == 'Email',
+        orElse: () => null,
+      );
+      final gmailConfig = conf.firstWhere(
+        (config) => config['idpname'] == 'Gmail',
+        orElse: () => null,
+      );
+      final gitHubConfig = conf.firstWhere(
+        (config) => config['idpname'] == 'GitHub',
+        orElse: () => null,
+      );
+      final facebookConfig = conf.firstWhere(
+        (config) => config['idpname'] == 'Facebook',
+        orElse: () => null,
+      );
+
+      // Set the single flag to true if any of the services are available
+      bool isAnyAvailable =
+          gmailConfig != null || gitHubConfig != null || facebookConfig != null;
+
+      // Update the flag based on the availability of any service
+      setState(() {
+        _isEmailAvailable = emailConfig != null;
+        _isAnySSOAvailable = isAnyAvailable;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConfig();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
+        if (_isEmailAvailable)...[
         const SizedBox(height: 40),
         // Email input field
         TextField(
@@ -345,7 +405,7 @@ class UsernameAndPassword extends StatelessWidget {
             const Text("Don't have an account? ",
                 style: TextStyle(color: Colors.grey)),
             TextButton(
-              onPressed: () => switchScreen("register"),
+              onPressed: () => widget.switchScreen("register"),
               child: const Text("Sign Up",
                   style: TextStyle(
                       color: Colors.black, fontWeight: FontWeight.bold)),
@@ -353,17 +413,19 @@ class UsernameAndPassword extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 20),
+        ],
         // Divider with "OR" text
-        Row(
-          children: [
-            const Expanded(child: Divider(color: Colors.grey)),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text("OR", style: TextStyle(color: Colors.grey)),
-            ),
-            const Expanded(child: Divider(color: Colors.grey)),
-          ],
-        ),
+        if (_isAnySSOAvailable && _isEmailAvailable)
+          Row(
+            children: [
+              const Expanded(child: Divider(color: Colors.grey)),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: Text("OR", style: TextStyle(color: Colors.grey)),
+              ),
+              const Expanded(child: Divider(color: Colors.grey)),
+            ],
+          ),
         const SizedBox(height: 20),
       ],
     );
