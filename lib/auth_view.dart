@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uids_io_sdk_flutter/auth.dart';
 import 'auth_buttons.dart';
 
@@ -199,8 +199,9 @@ class OtpScreen extends StatelessWidget {
       }
 
       try {
-        final prefs = await SharedPreferences.getInstance();
-        await verifyOtp(otp, prefs.getString('opt_access_token')??'', context);
+        final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+        String? otp_at = await secureStorage.read(key: "opt_access_token");
+        await verifyOtp(otp, otp_at ?? '', context);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString())), // Show the exact error message

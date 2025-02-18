@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class PK {
   static final BigInt startTime =
@@ -11,8 +11,11 @@ class PK {
   // Fetch deviceId automatically when calling getPK()
   static Future<void> _initializeIfNeeded() async {
     if (!_isInitialized) {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? deviceIdStr = prefs.getString('deviceId');
+      final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+      String? deviceIdStr = await secureStorage.read(key: "deviceId");
+      // final SharedPreferences prefs = await SharedPreferences.getInstance();
+      // String? deviceIdStr = prefs.getString('deviceId');
+      
 
       if (deviceIdStr == null || deviceIdStr.isEmpty) {
         throw Exception("Device ID not found in SharedPreferences");

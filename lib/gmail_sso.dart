@@ -12,7 +12,7 @@ import 'package:flutter/foundation.dart'; // For `kIsWeb`
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class GmailSSO {
   static Dio _dio = Dio();
@@ -39,10 +39,10 @@ class GmailSSO {
   }
 
   Future<void> _initializeGoogleSignIn() async {
-    final prefs = await SharedPreferences.getInstance();
-    clientId_shared_preferences = prefs.getString('clientId');
-    idpName_shared_preferences = prefs.getString('idpName');
-    deviceId_shared_preferences = prefs.getString('deviceId');
+    final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+    clientId_shared_preferences = await secureStorage.read(key: "clientId");
+    idpName_shared_preferences = await secureStorage.read(key: "idpName");
+    deviceId_shared_preferences = await secureStorage.read(key: "deviceId");
 
     print('Retrieved Client ID: $clientId_shared_preferences');
     print('Retrieved IDP Name: $idpName_shared_preferences');
@@ -191,10 +191,10 @@ class GmailSSO {
           final entityDta = responseData.entities[0];
           print('Single Entity tenant: ${entityDta.tenant}');
           print('Single Entity refreshtoken: ${entityDta.refreshToken}');
-          final prefs = await SharedPreferences.getInstance();
+          final FlutterSecureStorage secureStorage = FlutterSecureStorage();
           String jsonString = jsonEncode(response.data);
-          await prefs.setString('Entities_List', jsonString);
-          await prefs.setString('idpname_backend', responseData.idpname_backend);
+          await secureStorage.write(key: "Entities_List", value: jsonString);
+          await secureStorage.write(key: "idpname_backend", value: responseData.idpname_backend);
           getJwtFromBackend(
               responseData.username,
               responseData.idpname_backend,
@@ -204,10 +204,10 @@ class GmailSSO {
               context);
         } else {
           print('Multiple Entities');
-          final prefs = await SharedPreferences.getInstance();
+          final FlutterSecureStorage secureStorage = FlutterSecureStorage();
           String jsonString = jsonEncode(response.data);
-          await prefs.setString('Entities_List', jsonString);
-          await prefs.remove('JWT_Token');
+          await secureStorage.write(key: "Entities_List", value: jsonString);
+          await secureStorage.delete(key: "JWT_Token");
           context.goNamed('/');
         }
       } else {
@@ -240,10 +240,10 @@ class GmailSSO {
         final responseData = AuthTokenModel.fromJson(response.data);
         print('JWT Token: ${responseData.token}');
         print('RefreshToken: ${responseData.refreshToken}');
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('JWT_Token', responseData.token);
-        await prefs.setString('Refresh_Token', responseData.refreshToken);
-        await prefs.setString('Username', username);
+        final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+        await secureStorage.write(key: "JWT_Token", value: responseData.token);
+        await secureStorage.write(key: "Refresh_Token", value: responseData.refreshToken);
+        await secureStorage.write(key: "Username", value: username);
         context.goNamed('/');
       } else {
         print('Backend error: ${response.statusCode} ${response.data}');

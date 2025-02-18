@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uids_io_sdk_flutter/configuration.dart';
 import 'package:flutter/material.dart';
 import 'package:uids_io_sdk_flutter/gmail_sso.dart';
@@ -16,16 +16,15 @@ Future<void> loginWithCredentials(String email, String password) async {
     final response = await dio.post(
       url,
       data: {
-        'email': email,
+        'email': email,// change this to username
         'password': password,
       },
     );
     if (response.statusCode == 200) {
       final String accessToken = response.data['accessToken'];
       if (accessToken.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('opt_access_token', accessToken);
-        // _showQrCodePopup(context, qrCodeDataURL, accessToken);
+        final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+        await secureStorage.write(key: "opt_access_token", value: accessToken);
       } else {
         throw 'Invalid access token';
       }
@@ -184,8 +183,8 @@ Future<void> verifyOtp(
     );
 
     if (response.statusCode == 200) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('opt_access_token');
+      final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+      await secureStorage.delete(key: "opt_access_token");
       print('Response from backend: ${response.data}');
       final responseData = AuthResponseModel.fromJson(response.data);
       print('ErrorDetails: ${responseData.errorDetails}');
@@ -199,15 +198,16 @@ Future<void> verifyOtp(
         print('Single Entity refreshtoken: ${entityDta.refreshToken}');
 
         String jsonString = jsonEncode(response.data);
-        await prefs.setString('Entities_List', jsonString);
-        await prefs.setString('idpname_backend', responseData.idpname_backend);
+        await secureStorage.write(key: "Entities_List", value: jsonString);
+        await secureStorage.write(key: "idpname_backend", value: responseData.idpname_backend);
+        String? deviceId = await secureStorage.read(key: "deviceId");
         GmailSSO.getJwtFromBackend(responseData.username,responseData.idpname_backend, entityDta.tenant,
-            entityDta.refreshToken, prefs.getString('deviceId') ?? '', context);
+            entityDta.refreshToken, deviceId ?? '', context);
       } else {
         print('Multiple Entities');
         String jsonString = jsonEncode(response.data);
-        await prefs.setString('Entities_List', jsonString);
-        await prefs.remove('JWT_Token');
+        await secureStorage.write(key: "Entities_List", value: jsonString);
+        await secureStorage.delete(key: "JWT_Token");
         context.goNamed('/');
       }
     } else {

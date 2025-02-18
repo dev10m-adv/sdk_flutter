@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uids_io_sdk_flutter/configuration.dart';
 
 class ConfigurationService {
@@ -99,41 +99,16 @@ class ConfigurationService {
               print('IDP Name: $idpName');
               print('Device ID: $deviceId');
 
-              // Store values in SharedPreferences
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('clientId', clientId);
-              await prefs.setString('idpName', idpName);
-              await prefs.setString('deviceId', deviceId.toString());
+              final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+              await secureStorage.write(key: "clientId", value: clientId);
+              await secureStorage.write(key: "idpName", value: idpName);
+              await secureStorage.write(key: "deviceId", value: deviceId.toString());
             } else {
               print('No configuration found for Gmail');
             }
           }
         }
       }
-      // if (response.statusCode == 200) {
-      //   print('Device registered successfully: ${response.data}');
-      //   final responseData = response.data;
-      //   if (responseData['IsSuccess'] == true) {
-      //     final configurations = responseData['Configurations'];
-      //     if (configurations != null && configurations.isNotEmpty) {
-      //       final config = configurations[0];
-      //       final clientConfig = config['appidpclientconfiguration'];
-      //       final clientId = clientConfig['CLIENT_ID']??'';
-      //       final idpName = config['idpname'];
-      //       final deviceId = responseData['DeviceId'];
-
-      //       print('Client Id: $clientId');
-      //       print('IDP Name: $idpName');
-      //       print('Device ID: $deviceId');
-
-      //       // Store values in SharedPreferences
-      //       final prefs = await SharedPreferences.getInstance();
-      //       await prefs.setString('clientId', clientId);
-      //       await prefs.setString('idpName', idpName);
-      //       await prefs.setString('deviceId', deviceId.toString());
-      //     }
-      //   }
-      // }
       else {
         print(
             'Failed to register device: ${response.statusCode} ${response.data}');
