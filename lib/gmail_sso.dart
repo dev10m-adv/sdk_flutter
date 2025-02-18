@@ -173,7 +173,7 @@ class GmailSSO {
       final model = AzureTokenInputModel(
           accessToken: accessToken, idpName: idpName_shared_preferences ?? '');
       final response = await _dio.post(
-        '${Configuration.apiUrl}/auth',
+        '${Configuration.authUrl}/auth',
         data: model.toJson(),
       );
 
@@ -236,7 +236,7 @@ class GmailSSO {
           refreshToken: refreshToken,
           deviceId: deviceId);
       final response = await _dio.post(
-        '${Configuration.apiUrl}/aud',
+        '${Configuration.authUrl}/aud',
         data: model.toJson(),
       );
 

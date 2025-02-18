@@ -9,7 +9,7 @@ import 'package:uids_io_sdk_flutter/configuration.dart';
 
 class RegisterService {
   static final Dio _dio = Dio();
-  static final String apiUrl = Configuration.apiUrl;
+  static final String authUrl = Configuration.authUrl;
 
   static Future<void> registerDeviceData() async {
     final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
@@ -56,7 +56,7 @@ class RegisterService {
   }
 
   static Future<void> registerDevice(Map<String, dynamic> data) async {
-    final String url = '$apiUrl/registerdevice';
+    final String url = '$authUrl/registerdevice';
     print('Registering device with data: $data');
 
     try {

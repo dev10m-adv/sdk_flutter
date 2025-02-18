@@ -6,7 +6,7 @@ import 'package:uids_io_sdk_flutter/configuration.dart';
 
 class RefreshTokenService {
   final Dio _dio = Dio();
-  final String _refreshUrl = '${Configuration.apiUrl}/refresh';
+  final String _refreshUrl = '${Configuration.authUrl}/refresh';
   Timer? _timer;
 
   RefreshTokenService() {
