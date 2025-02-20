@@ -69,8 +69,8 @@ class GmailSSO {
       if (account != null) {
         final GoogleSignInAuthentication auth = await account.authentication;
         if (auth.accessToken != null) {
-          print('Access Token: ${auth.accessToken}');
-          print('Id Token: ${auth.idToken}');
+          // print('Access Token: ${auth.accessToken}');
+          // print('Id Token: ${auth.idToken}');
           await sendToBackend(auth.accessToken!, context);
         }
       }
@@ -85,8 +85,8 @@ class GmailSSO {
       if (account != null) {
         final GoogleSignInAuthentication auth = await account.authentication;
         if (auth.accessToken != null) {
-          print('Access Token: ${auth.accessToken}');
-          print('ID Token: ${auth.idToken}');
+          // print('Access Token: ${auth.accessToken}');
+          // print('ID Token: ${auth.idToken}');
           await sendToBackend(auth.accessToken!, context);
         } else {
           print('Error: Missing access token or ID token');
@@ -140,7 +140,7 @@ class GmailSSO {
                       final code =
                           Uri.parse(url.toString()).queryParameters['code'];
                       if (code != null) {
-                        print('Authorization code: $code');
+                        // print('Authorization code: $code');
                         sendToBackend(code, context, 'authCode');
                         if (Navigator.canPop(context)) {
                           Navigator.of(context).pop(); // Close the popup
@@ -168,27 +168,20 @@ class GmailSSO {
 
   Future<void> sendToBackend(String accessToken, BuildContext context,
       [String? tokenType]) async {
-    print('Function Send To Backend accessToken: $accessToken');
     try {
       final model = AzureTokenInputModel(
           accessToken: accessToken, idpName: idpName_shared_preferences ?? '');
       final response = await _dio.post(
-        '${Configuration.authUrl}/auth',
+        '${Configuration.AuthUrl}/auth',
         data: model.toJson(),
       );
 
       if (response.statusCode == 200) {
-        print('Response from backend: ${response.data}');
         final responseData = AuthResponseModel.fromJson(response.data);
-        print('ErrorDetails: ${responseData.errorDetails}');
-        print('Username: ${responseData.username}');
-        print('idpname: ${responseData.idpname_backend}');
-        print('Entities: ${responseData.entities}');
         print('Entities Length: ${responseData.entities.length}');
         if (responseData.entities.length == 1) {
           final entityDta = responseData.entities[0];
-          print('Single Entity tenant: ${entityDta.tenant}');
-          print('Single Entity refreshtoken: ${entityDta.refreshToken}');
+          print('Single Entity');
           final FlutterSecureStorage secureStorage = FlutterSecureStorage();
           String jsonString = jsonEncode(response.data);
           await secureStorage.write(key: "Entities_List", value: jsonString);
@@ -236,14 +229,12 @@ class GmailSSO {
           refreshToken: refreshToken,
           deviceId: deviceId);
       final response = await _dio.post(
-        '${Configuration.authUrl}/aud',
+        '${Configuration.AuthUrl}/aud',
         data: model.toJson(),
       );
 
       if (response.statusCode == 200) {
         final responseData = AuthTokenModel.fromJson(response.data);
-        print('JWT Token: ${responseData.token}');
-        print('RefreshToken: ${responseData.refreshToken}');
         final FlutterSecureStorage secureStorage = FlutterSecureStorage();
         await secureStorage.write(key: "JWT_Token", value: responseData.token);
         await secureStorage.write(

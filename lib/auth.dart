@@ -10,7 +10,7 @@ import 'package:uids_io_sdk_flutter/models/auth_response_model.dart';
 
 Future<void> loginWithCredentials(String email, String password) async {
   Dio dio = Dio();
-  final String authUrl = Configuration.authUrl;
+  final String authUrl = Configuration.AuthUrl;
   final String url = '$authUrl/login';
   try {
     final response = await dio.post(
@@ -45,7 +45,7 @@ Future<void> loginWithCredentials(String email, String password) async {
 Future<void> registerUser(String username, String email, String password,
     BuildContext context) async {
   Dio dio = Dio();
-  final String authUrl = Configuration.authUrl;
+  final String authUrl = Configuration.AuthUrl;
   final String url = '$authUrl/register';
 
   try {
@@ -165,7 +165,7 @@ void _showQrCodePopup(
 Future<void> verifyOtp(
     String otp, String accessToken, BuildContext context) async {
   Dio dio = Dio();
-  final String authUrl = Configuration.authUrl;
+  final String authUrl = Configuration.AuthUrl;
   final String url = '$authUrl/otpverify';
 
   try {

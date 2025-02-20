@@ -2,19 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:dio/dio.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uids_io_sdk_flutter/configuration.dart';
 
 class RegisterService {
   static final Dio _dio = Dio();
-  static final String authUrl = Configuration.authUrl;
+  static final String authUrl = Configuration.AuthUrl;
 
   static Future<void> registerDeviceData() async {
-    final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     print('Registering device...');
-    print(deviceInfo);
     String deviceType;
     String devicePlatform;
     String deviceToken = await getDeviceToken();
@@ -43,13 +40,17 @@ class RegisterService {
     }
 
     Map<String, dynamic> data = {
-      'appdomain': 'auth1.3u.gg',
       'deviceType': deviceType,
       'deviceToken': deviceToken,
       'devicePlatform': devicePlatform,
     };
     try {
-      await registerDevice(data);
+      final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+      String? isRegistered = await secureStorage.read(key: "IsRegisterDevice");
+      bool isRegisterDevice = isRegistered == "true";
+      if (!isRegisterDevice) {
+        await registerDevice(data);
+      }
     } catch (e) {
       print('Error during device registration: $e');
     }
@@ -57,8 +58,6 @@ class RegisterService {
 
   static Future<void> registerDevice(Map<String, dynamic> data) async {
     final String url = '$authUrl/registerdevice';
-    print('Registering device with data: $data');
-
     try {
       final response = await _dio.post(
         url,
@@ -69,18 +68,20 @@ class RegisterService {
       );
 
       if (response.statusCode == 200) {
-        print('Device registered successfully: ${response.data}');
         final responseData = response.data;
-
-        if (responseData['IsSuccess'] == true) {
-          final FlutterSecureStorage secureStorage = FlutterSecureStorage();
-          final deviceId = responseData['DeviceId'];
-          await secureStorage.write(key: "DeviceId", value: deviceId.toString());
-          final configurations = responseData['Configurations'];
-          if (configurations != null && configurations.isNotEmpty) {
-            String jsonString = jsonEncode(configurations);
-            await secureStorage.write(key: "Configurations", value: jsonString);
-          }
+        final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+        final deviceId = responseData['DeviceId'];
+        final audDomain = responseData['AudDomain'];
+        if (audDomain != Configuration.AudDomain) {
+          print(
+              'Updating AudDomain from ${Configuration.AudDomain} to $audDomain');
+        }
+        await secureStorage.write(key: "DeviceId", value: deviceId.toString());
+        final configurations = responseData['Configurations'];
+        if (configurations != null && configurations.isNotEmpty) {
+          String jsonString = jsonEncode(configurations);
+          await secureStorage.write(key: "Configurations", value: jsonString);
+          await secureStorage.write(key: "IsRegisterDevice", value: "true");
         }
       } else {
         print(
