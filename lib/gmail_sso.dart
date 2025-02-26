@@ -14,11 +14,13 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class GmailSSO {
-  static Dio _dio = Dio();
+  static Dio _dio =  Dio();
   late final GoogleSignIn _googleSignIn;
+  late final GoogleSignIn _googleSignInAndroid;
   String? clientId_shared_preferences;
   String? idpName_shared_preferences;
   String? deviceId_shared_preferences;
+  String? redirect_uri_shared_preferences;
 
   GmailSSO() {
     _initialize();
@@ -40,6 +42,7 @@ class GmailSSO {
       final clientConfig = config['appidpclientconfiguration'];
       final FlutterSecureStorage secureStorage = FlutterSecureStorage();
       clientId_shared_preferences = clientConfig?['CLIENT_ID'] ?? '';
+      redirect_uri_shared_preferences = clientConfig?['REDIRECT_URI'] ?? '';
       idpName_shared_preferences = config['idpname'];
       deviceId_shared_preferences = await secureStorage.read(key: "DeviceId");
     } else {
@@ -51,6 +54,11 @@ class GmailSSO {
       clientId: clientId_shared_preferences,
       scopes: ['email', 'profile', 'openid'],
     );
+    _googleSignInAndroid = GoogleSignIn(
+      serverClientId: clientId_shared_preferences,
+      scopes: ['openid'],
+    );
+    print('Google Sign-In initialized: ${clientId_shared_preferences}');
   }
 
   Future<void> signInWithGoogle(BuildContext context) async {
@@ -81,7 +89,7 @@ class GmailSSO {
 
   Future<void> _signInWithGoogleMobile(BuildContext context) async {
     try {
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+      final GoogleSignInAccount? account = await _googleSignInAndroid.signIn();
       if (account != null) {
         final GoogleSignInAuthentication auth = await account.authentication;
         if (auth.accessToken != null) {
@@ -100,7 +108,7 @@ class GmailSSO {
   Future<void> _signInWithGoogleDesktop(BuildContext context) async {
     try {
       final String clientId = clientId_shared_preferences ?? '';
-      final String redirectUri = 'http://localhost:3001/callback';
+      final String redirectUri = redirect_uri_shared_preferences ?? '';
       const String authorizationEndpoint =
           'https://accounts.google.com/o/oauth2/auth';
       const String scope = 'openid email profile';
@@ -108,61 +116,86 @@ class GmailSSO {
       final String authUrl =
           '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=$redirectUri&scope=$scope';
       print('AuthUrl: $authUrl');
-      showDialog(
-        context: context,
-        barrierColor: Colors.black54, // Set a semi-transparent background
-        builder: (BuildContext context) {
-          return Dialog(
-            backgroundColor:
-                Colors.transparent, // Make dialog background transparent
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 600),
-              child: Container(
-                width: double.maxFinite,
-                height: 500,
-                decoration: BoxDecoration(
-                  color:
-                      Colors.white, // Set the background color of the content
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: InAppWebView(
-                  initialUrlRequest: URLRequest(url: WebUri(authUrl)),
-                  onLoadStart: (controller, url) {
-                    print('Started loading: $url');
-                    if (url.toString().startsWith(redirectUri)) {
-                      final code =
-                          Uri.parse(url.toString()).queryParameters['code'];
-                      if (code != null) {
-                        // print('Authorization code: $code');
-                        sendToBackend(code, context, 'authCode');
-                        if (Navigator.canPop(context)) {
-                          Navigator.of(context).pop(); // Close the popup
-                        }
-                      }
-                    }
-                  },
-                  onLoadStop: (controller, url) {
-                    print('Stopped loading: $url');
-                  },
-                  onLoadError: (controller, url, code, message) {
-                    print(
-                        'Error loading: $url, Code: $code, Message: $message');
-                  },
-                ),
-              ),
-            ),
-          );
-        },
-      );
+
+      _showOAuthDialog(context, authUrl);
     } catch (e) {
       print('Error during OAuth on Desktop with InAppWebView: $e');
+    }
+  }
+
+  void _showOAuthDialog(BuildContext context, String authUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Container(
+              width: double.maxFinite,
+              height: 500,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: InAppWebView(
+                initialUrlRequest: URLRequest(url: WebUri(authUrl)),
+                onLoadStart: (controller, url) {
+                  print('Started loading: $url');
+                  _handleOAuthResponse(controller, url, context);
+                },
+                onLoadStop: (controller, url) {
+                  print('Stopped loading: $url');
+                },
+                onLoadError: (controller, url, code, message) {
+                  print('Error loading: $url, Code: $code, Message: $message');
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleOAuthResponse(
+      InAppWebViewController controller, Uri? url, BuildContext context) async {
+    try {
+      final String? scriptResult =
+          await controller.evaluateJavascript(source: '''
+      (function() {
+        return JSON.stringify(document.body.innerText);
+      })();
+    ''');
+
+      if (scriptResult != null) {
+        final String sanitizedValue = scriptResult
+            .replaceAll(r'\"', '"')
+            .replaceAll(RegExp(r'^"|"$'), '');
+
+        final dynamic decodedJson = json.decode(sanitizedValue);
+        print('Decoded JSON: $decodedJson');
+
+        if (decodedJson is Map<String, dynamic> &&
+            decodedJson.containsKey('access_token')) {
+          // if (Navigator.canPop(context)) {
+          //   Navigator.of(context).pop();
+          // }
+          sendToBackend(decodedJson['access_token'], context);
+        } else {
+          print('Error: access_token not found in JSON response');
+        }
+      }
+    } catch (e) {
+      print('Error decoding JSON: $e');
     }
   }
 
@@ -170,7 +203,9 @@ class GmailSSO {
       [String? tokenType]) async {
     try {
       final model = AzureTokenInputModel(
-          accessToken: accessToken, idpName: idpName_shared_preferences ?? '');
+          accessToken: accessToken,
+          idpName: idpName_shared_preferences ?? '',
+          tokenType: tokenType);
       final response = await _dio.post(
         '${Configuration.AuthUrl}/auth',
         data: model.toJson(),
@@ -187,13 +222,15 @@ class GmailSSO {
           await secureStorage.write(key: "Entities_List", value: jsonString);
           await secureStorage.write(
               key: "idpname_backend", value: responseData.idpname_backend);
-          getJwtFromBackend(
-              responseData.username,
-              responseData.idpname_backend,
-              entityDta.tenant,
-              entityDta.refreshToken,
-              deviceId_shared_preferences ?? '',
-              context);
+          if (context.mounted) {
+            getJwtFromBackend(
+                responseData.username,
+                responseData.idpname_backend,
+                entityDta.tenant,
+                entityDta.refreshToken,
+                deviceId_shared_preferences ?? '',
+                context);
+          }
         } else {
           print('Multiple Entities');
           final FlutterSecureStorage secureStorage = FlutterSecureStorage();
