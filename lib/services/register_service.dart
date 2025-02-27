@@ -45,12 +45,7 @@ class RegisterService {
       'devicePlatform': devicePlatform,
     };
     try {
-      final FlutterSecureStorage secureStorage = FlutterSecureStorage();
-      String? isRegistered = await secureStorage.read(key: "IsRegisterDevice");
-      bool isRegisterDevice = isRegistered == "true";
-      if (!isRegisterDevice) {
-        await registerDevice(data);
-      }
+      await registerDevice(data);
     } catch (e) {
       print('Error during device registration: $e');
     }
@@ -73,19 +68,16 @@ class RegisterService {
         final deviceId = responseData['DeviceId'];
         final audDomain = responseData['AudDomain'];
         if (audDomain != Configuration.AudDomain) {
-          print(
-              'Updating AudDomain from ${Configuration.AudDomain} to $audDomain');
+          print('Please update AudDomain from ${Configuration.AudDomain} to $audDomain');
         }
         await secureStorage.write(key: "DeviceId", value: deviceId.toString());
         final configurations = responseData['Configurations'];
         if (configurations != null && configurations.isNotEmpty) {
           String jsonString = jsonEncode(configurations);
           await secureStorage.write(key: "Configurations", value: jsonString);
-          await secureStorage.write(key: "IsRegisterDevice", value: "true");
         }
       } else {
-        print(
-            'Failed to register device: ${response.statusCode} ${response.data}');
+        print('Failed to register device: ${response.statusCode} ${response.data}');
       }
     } catch (e) {
       print('Error registering device: $e');

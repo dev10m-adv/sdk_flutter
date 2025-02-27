@@ -14,7 +14,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class GmailSSO {
-  static Dio _dio =  Dio();
+  static Dio _dio = Dio();
   late final GoogleSignIn _googleSignIn;
   late final GoogleSignIn _googleSignInAndroid;
   String? clientId_shared_preferences;
@@ -58,7 +58,6 @@ class GmailSSO {
       serverClientId: clientId_shared_preferences,
       scopes: ['openid'],
     );
-    print('Google Sign-In initialized: ${clientId_shared_preferences}');
   }
 
   Future<void> signInWithGoogle(BuildContext context) async {
@@ -124,50 +123,64 @@ class GmailSSO {
   }
 
   void _showOAuthDialog(BuildContext context, String authUrl) {
+    bool isPopupVisible = true;
+
     showDialog(
       context: context,
       barrierColor: Colors.black54,
       builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Container(
-              width: double.maxFinite,
-              height: 500,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Visibility(
+                  visible: isPopupVisible,
+                  child: Container(
+                    width: double.maxFinite,
+                    height: 500,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: InAppWebView(
+                      initialUrlRequest: URLRequest(url: WebUri(authUrl)),
+                      onLoadStart: (controller, url) {
+                        print('Started loading: $url');
+                        _handleOAuthResponse(controller, url, context, () {
+                          setState(() {
+                            isPopupVisible = false; // Hide the popup
+                          });
+                        });
+                      },
+                      onLoadStop: (controller, url) {
+                        print('Stopped loading: $url');
+                      },
+                      onLoadError: (controller, url, code, message) {
+                        print(
+                            'Error loading: $url, Code: $code, Message: $message');
+                      },
+                    ),
                   ),
-                ],
+                ),
               ),
-              child: InAppWebView(
-                initialUrlRequest: URLRequest(url: WebUri(authUrl)),
-                onLoadStart: (controller, url) {
-                  print('Started loading: $url');
-                  _handleOAuthResponse(controller, url, context);
-                },
-                onLoadStop: (controller, url) {
-                  print('Stopped loading: $url');
-                },
-                onLoadError: (controller, url, code, message) {
-                  print('Error loading: $url, Code: $code, Message: $message');
-                },
-              ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  void _handleOAuthResponse(
-      InAppWebViewController controller, Uri? url, BuildContext context) async {
+  void _handleOAuthResponse(InAppWebViewController controller, Uri? url,
+      BuildContext context, VoidCallback onClosePopup) async {
     try {
       final String? scriptResult =
           await controller.evaluateJavascript(source: '''
@@ -186,10 +199,11 @@ class GmailSSO {
 
         if (decodedJson is Map<String, dynamic> &&
             decodedJson.containsKey('access_token')) {
-          // if (Navigator.canPop(context)) {
-          //   Navigator.of(context).pop();
-          // }
-          sendToBackend(decodedJson['access_token'], context);
+          // Close the popup using the callback
+          onClosePopup();
+
+          // Send the access token to the backend
+          await sendToBackend(decodedJson['access_token'], context);
         } else {
           print('Error: access_token not found in JSON response');
         }
