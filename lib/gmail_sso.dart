@@ -33,14 +33,18 @@ class GmailSSO {
     final FlutterSecureStorage secureStorage = FlutterSecureStorage();
     final confString = await secureStorage.read(key: 'Configurations');
     List<dynamic> conf = jsonDecode(confString!);
+    // final config = conf.firstWhere(
+    //   (config) => config['idpname'] == 'Gmail',
+    //   orElse: () => null, // Avoids crash if no match is found
+    // );
     final config = conf.firstWhere(
       (config) => config['idpname'] == 'Gmail',
-      orElse: () => null, // Avoids crash if no match is found
+      orElse: () => {}, // Returns an empty map instead of null
     );
+
 
     if (config != null) {
       final clientConfig = config['appidpclientconfiguration'];
-      final FlutterSecureStorage secureStorage = FlutterSecureStorage();
       clientId_shared_preferences = clientConfig?['CLIENT_ID'] ?? '';
       redirect_uri_shared_preferences = clientConfig?['REDIRECT_URI'] ?? '';
       idpName_shared_preferences = config['idpname'];
