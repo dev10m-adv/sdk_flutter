@@ -159,14 +159,14 @@ class GmailSSO {
                       initialUrlRequest: URLRequest(url: WebUri(authUrl)),
                       onLoadStart: (controller, url) {
                         print('Started loading: $url');
-                        _handleOAuthResponse(controller, url, context, () {
+                      },
+                      onLoadStop: (controller, url) {
+                        print('Stopped loading: $url');
+                          _handleOAuthResponse(controller, url, context, () {
                           setState(() {
                             isPopupVisible = false; // Hide the popup
                           });
                         });
-                      },
-                      onLoadStop: (controller, url) {
-                        print('Stopped loading: $url');
                       },
                       onLoadError: (controller, url, code, message) {
                         print(
