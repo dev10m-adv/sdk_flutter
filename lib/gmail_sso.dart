@@ -15,6 +15,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class GmailSSO {
   static Dio _dio = Dio();
+  static Dio dio2 = Dio();
   late final GoogleSignIn _googleSignIn;
   late final GoogleSignIn _googleSignInAndroid;
   String? clientId_shared_preferences;
@@ -41,7 +42,6 @@ class GmailSSO {
       (config) => config['idpname'] == 'Gmail',
       orElse: () => {}, // Returns an empty map instead of null
     );
-
 
     if (config != null) {
       final clientConfig = config['appidpclientconfiguration'];
@@ -117,8 +117,9 @@ class GmailSSO {
       const String scope = 'openid email profile';
 
       final String authUrl =
-          '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=$redirectUri&scope=$scope';
-      print('AuthUrl: $authUrl');
+          '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=$redirectUri&scope=$scope&prompt=select_account';
+      // print('AuthUrl: $authUrl');
+      //await CookieManager.instance().deleteAllCookies();
 
       _showOAuthDialog(context, authUrl);
     } catch (e) {
@@ -158,15 +159,21 @@ class GmailSSO {
                     child: InAppWebView(
                       initialUrlRequest: URLRequest(url: WebUri(authUrl)),
                       onLoadStart: (controller, url) {
-                        print('Started loading: $url');
+                        // print('Started loading: $url');
                       },
                       onLoadStop: (controller, url) {
-                        print('Stopped loading: $url');
+                        // print('Stopped loading: $url');
+                        if (url != null &&
+                            url.toString().startsWith(
+                                redirect_uri_shared_preferences ?? '')) {
                           _handleOAuthResponse(controller, url, context, () {
-                          setState(() {
-                            isPopupVisible = false; // Hide the popup
+                            setState(() {
+                              isPopupVisible = false; // Hide the popup
+                            });
                           });
-                        });
+                        } else {
+                          print('Intermediate page loaded');
+                        }
                       },
                       onLoadError: (controller, url, code, message) {
                         print(
@@ -197,9 +204,7 @@ class GmailSSO {
         final String sanitizedValue = scriptResult
             .replaceAll(r'\"', '"')
             .replaceAll(RegExp(r'^"|"$'), '');
-
         final dynamic decodedJson = json.decode(sanitizedValue);
-        print('Decoded JSON: $decodedJson');
 
         if (decodedJson is Map<String, dynamic> &&
             decodedJson.containsKey('access_token')) {
@@ -283,9 +288,12 @@ class GmailSSO {
           tenant: tenant,
           refreshToken: refreshToken,
           deviceId: deviceId);
-      final response = await _dio.post(
+      final response = await dio2.post(
         '${Configuration.AuthUrl}/aud',
         data: model.toJson(),
+        options: Options(
+          extra: {'_database_name': tenant}, // Set in request options
+        ),
       );
 
       if (response.statusCode == 200) {

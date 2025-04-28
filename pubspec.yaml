@@ -1,6 +1,6 @@
 name: uids_io_sdk_flutter
 description: "A Flutter package to integrate  Single Sign-On (SSO) for Web, Android, iOS, and Desktop platforms"
-version: 0.0.4
+version: 0.0.5
 homepage: https://github.com/uids-io/sdk_flutter.git
 repository: https://github.com/uids-io/sdk_flutter.git
 

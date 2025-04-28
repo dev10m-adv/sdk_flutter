@@ -71,7 +71,6 @@ class RegisterService {
           print('Please update AudDomain from ${Configuration.AudDomain} to $audDomain');
         }
         await secureStorage.write(key: "DeviceId", value: deviceId.toString());
-        await secureStorage.write(key: "DatabaseName", value: '1234567890');
         final configurations = responseData['Configurations'];
         if (configurations != null && configurations.isNotEmpty) {
           String jsonString = jsonEncode(configurations);

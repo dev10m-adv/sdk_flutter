@@ -9,6 +9,8 @@ class AuthLogout extends StatelessWidget {
     final FlutterSecureStorage secureStorage = FlutterSecureStorage();
     await secureStorage.delete(key: "Entities_List");
     await secureStorage.delete(key: "JWT_Token");
+    await secureStorage.delete(key: "Username");
+    await secureStorage.delete(key: "DatabaseName");
     print('Logged out');
     if (context.mounted) {
       context.goNamed('/auth');
