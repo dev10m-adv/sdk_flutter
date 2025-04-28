@@ -259,6 +259,7 @@ class GmailSSO {
           final FlutterSecureStorage secureStorage = FlutterSecureStorage();
           String jsonString = jsonEncode(response.data);
           await secureStorage.write(key: "Entities_List", value: jsonString);
+           await secureStorage.write(key: "idpname_backend", value: responseData.idpname_backend);
           await secureStorage.delete(key: "JWT_Token");
           context.goNamed('/');
         }
