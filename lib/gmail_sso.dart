@@ -45,14 +45,19 @@ class GmailSSO {
     final List<dynamic> conf = jsonDecode(confString) as List<dynamic>;
     Map<String, dynamic> map = <String, dynamic>{};
     for (final dynamic item in conf) {
-      if (item is Map && item['idpname'] == 'Gmail') {
-        map = Map<String, dynamic>.from(item);
-        break;
+      if (item is Map) {
+        final m = Map<String, dynamic>.from(item);
+        final idpName = m['idp_name'] ?? m['idpname'];
+        if (idpName == 'Gmail') {
+          map = m;
+          break;
+        }
       }
     }
 
     if (map.isNotEmpty) {
-      final clientConfig = map['appidpclientconfiguration'];
+      final clientConfig =
+          map['app_idp_client_configuration'] ?? map['appidpclientconfiguration'];
       if (clientConfig is Map) {
         final Map<String, dynamic> cc = Map<String, dynamic>.from(clientConfig);
         clientId_shared_preferences = cc['CLIENT_ID'] as String? ?? '';
@@ -308,7 +313,7 @@ class GmailSSO {
     try {
       final model = AudModel(
         username: username,
-        idpname_backend: idpName,
+        idpName: idpName,
         tenant: tenant,
         refreshToken: refreshToken,
         deviceId: deviceId,

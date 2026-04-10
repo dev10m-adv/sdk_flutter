@@ -12,6 +12,7 @@ Targets **Web**, **Android**, **iOS**, and **desktop** (Linux, macOS, Windows).
 - **Google sign-in** – `GmailSSO` for Google OAuth; uses platform-appropriate flows (including GIS on web).
 - **Tokens** – JWT and refresh handling with `RefreshTokenService` and secure storage.
 - **Optional UI** – `AuthScreen`, `AuthButtons`, and `AuthLogout` for a quick integration with `go_router`.
+- **Stable response models** – `lib/models/sdk_outputs.dart` defines fixed Dart shapes (`AuthEntitiesResponse`, `TenantBinding`, `AudTokenResponse`, `RefreshTokenResponse`, `DeviceRegistrationResponse`) with `fromJson` that accepts both AdvComm AuthAPI wire keys (`Token`, `refresh_token`, …) and normalized `toJson` for storage. Import from `package:uids_io_sdk_flutter/models/sdk_outputs.dart` or the package barrel (`uids_io_sdk_flutter.dart`). Legacy types (`AuthResponseModel`, `Entity`, `AuthTokenModel`) remain and delegate to these DTOs where applicable.
 
 ## Requirements
 

@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uids_io_sdk_flutter/configuration.dart';
+import 'package:uids_io_sdk_flutter/models/sdk_outputs.dart';
 
 class RegisterService {
   static final Dio _dio = Dio();
@@ -62,18 +63,22 @@ class RegisterService {
         ),
       );
 
-      if (response.statusCode == 200) {
-        final responseData = response.data;
+      if (response.statusCode == 200 && response.data is Map) {
+        final parsed = DeviceRegistrationResponse.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        );
         final FlutterSecureStorage secureStorage = FlutterSecureStorage();
-        final deviceId = responseData['DeviceId'];
-        final audDomain = responseData['AudDomain'];
-        if (audDomain != Configuration.AudDomain) {
-          print('Please update AudDomain from ${Configuration.AudDomain} to $audDomain');
+        if (parsed.audDomain != Configuration.AudDomain) {
+          print(
+            'Please update AudDomain from ${Configuration.AudDomain} to ${parsed.audDomain}',
+          );
         }
-        await secureStorage.write(key: "DeviceId", value: deviceId.toString());
-        final configurations = responseData['Configurations'];
-        if (configurations != null && configurations.isNotEmpty) {
-          String jsonString = jsonEncode(configurations);
+        await secureStorage.write(
+          key: "DeviceId",
+          value: parsed.deviceId.toString(),
+        );
+        if (parsed.configurations.isNotEmpty) {
+          final jsonString = jsonEncode(parsed.configurations);
           await secureStorage.write(key: "Configurations", value: jsonString);
         }
       } else {

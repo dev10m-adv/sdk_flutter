@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:uids_io_sdk_flutter/configuration.dart';
+import 'package:uids_io_sdk_flutter/models/sdk_outputs.dart';
 
 class RefreshTokenService {
   final Dio _dio = Dio();
@@ -68,17 +69,17 @@ class RefreshTokenService {
     // Debugging: Print the full API response
     print('API Response: ${response.data}');
 
-    if (response.statusCode == 200) {
-      // Check if the response contains the expected keys
-      if (response.data != null &&
-          response.data['Token'] != null &&
-          response.data['RefreshToken'] != null) {
-        final newJwtToken = response.data['Token'] as String;
-        final newRefreshToken = response.data['RefreshToken'] as String;
-
+    if (response.statusCode == 200 && response.data is Map) {
+      final parsed = RefreshTokenResponse.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+      if (parsed.accessToken.isNotEmpty && parsed.refreshToken.isNotEmpty) {
         final FlutterSecureStorage secureStorage = FlutterSecureStorage();
-        await secureStorage.write(key: "JWT_Token", value: newJwtToken);
-        await secureStorage.write(key: "Refresh_Token", value: newRefreshToken);
+        await secureStorage.write(key: "JWT_Token", value: parsed.accessToken);
+        await secureStorage.write(
+          key: "Refresh_Token",
+          value: parsed.refreshToken,
+        );
         print('Token refreshed successfully');
       } else {
         print('Invalid response format: Missing Token or RefreshToken');

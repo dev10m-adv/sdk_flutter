@@ -1,22 +1,28 @@
+/// Request body for `POST /aud` (wire format uses PascalCase keys in [toJson]).
 class AudModel {
   final String username;
   final String tenant;
   final String refreshToken;
   final String deviceId;
-  final String idpname_backend;
+
+  /// IdP name (e.g. `Gmail`, `Email`).
+  final String idpName;
+
+  @Deprecated('Use idpName')
+  String get idpname_backend => idpName;
 
   AudModel({
     required this.username,
     required this.tenant,
     required this.refreshToken,
     required this.deviceId,
-    required this.idpname_backend,
+    required this.idpName,
   });
 
   factory AudModel.fromJson(Map<String, dynamic> json) {
     return AudModel(
       username: json['Username'] ?? '',
-      idpname_backend: json['IdpName'] ?? '',
+      idpName: json['IdpName'] ?? '',
       tenant: json['Tenant'] ?? '',
       refreshToken: json['RefreshToken'] ?? '',
       deviceId: json['DeviceID'] ?? '',
@@ -26,7 +32,7 @@ class AudModel {
   Map<String, dynamic> toJson() {
     return {
       'Username': username,
-      'IdpName': idpname_backend,
+      'IdpName': idpName,
       'Tenant': tenant,
       'RefreshToken': refreshToken,
       'DeviceID': deviceId,
