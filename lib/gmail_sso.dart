@@ -13,6 +13,7 @@ import 'package:uids_io_sdk_flutter/models/aud_model.dart';
 import 'package:uids_io_sdk_flutter/models/auth_response_model.dart';
 import 'package:uids_io_sdk_flutter/models/auth_token_model.dart';
 import 'package:uids_io_sdk_flutter/models/azure_token_input_model.dart';
+import 'package:uids_io_sdk_flutter/src/sdk_log.dart';
 
 import 'gmail_sso_web_stub.dart'
     if (dart.library.html) 'gmail_sso_web_impl.dart'
@@ -104,8 +105,8 @@ class GmailSSO {
       if (token != null && context.mounted) {
         await sendToBackend(token, context);
       }
-    } catch (e) {
-      debugPrint('Error during Google Sign-In: $e');
+    } catch (e, st) {
+      sdkLogError('gmail', 'Google Sign-In (web) failed', error: e, stackTrace: st);
     }
   }
 
@@ -118,8 +119,8 @@ class GmailSSO {
           .authorizeScopes(_googleScopes);
       if (!context.mounted) return;
       await sendToBackend(authz.accessToken, context);
-    } on GoogleSignInException catch (e) {
-      debugPrint('Error during Google Sign-In: $e');
+    } on GoogleSignInException catch (e, st) {
+      sdkLogWarning('gmail', 'Google Sign-In (mobile): $e', error: e, stackTrace: st);
     }
   }
 
@@ -135,8 +136,8 @@ class GmailSSO {
           '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=$redirectUri&scope=$scope&prompt=select_account';
 
       _showOAuthDialog(context, authUrl);
-    } catch (e) {
-      debugPrint('Error during OAuth on Desktop with InAppWebView: $e');
+    } catch (e, st) {
+      sdkLogError('gmail', 'desktop OAuth webview setup failed', error: e, stackTrace: st);
     }
   }
 
@@ -183,12 +184,13 @@ class GmailSSO {
                             });
                           });
                         } else {
-                          debugPrint('Intermediate page loaded');
+                          sdkLogDebug('gmail', 'oauth intermediate page loaded');
                         }
                       },
                       onReceivedError: (controller, request, error) {
-                        debugPrint(
-                          'Error loading: ${request.url}, ${error.description}',
+                        sdkLogWarning(
+                          'gmail',
+                          'webview load error: ${request.url} ${error.description}',
                         );
                       },
                     ),
@@ -229,11 +231,11 @@ class GmailSSO {
 
           await sendToBackend(decodedJson['access_token'] as String, context);
         } else {
-          debugPrint('Error: access_token not found in JSON response');
+          sdkLogWarning('gmail', 'OAuth callback JSON missing access_token');
         }
       }
-    } catch (e) {
-      debugPrint('Error decoding JSON: $e');
+    } catch (e, st) {
+      sdkLogError('gmail', 'OAuth callback parse failed', error: e, stackTrace: st);
     }
   }
 
@@ -255,10 +257,13 @@ class GmailSSO {
 
       if (response.statusCode == 200) {
         final responseData = AuthResponseModel.fromJson(response.data);
-        debugPrint('Entities Length: ${responseData.entities.length}');
+        sdkLogDebug(
+          'gmail',
+          '/auth ok entities=${responseData.entities.length}',
+        );
         if (responseData.entities.length == 1) {
           final entityDta = responseData.entities[0];
-          debugPrint('Single Entity');
+          sdkLogDebug('gmail', 'single entity tenant=${entityDta.tenant}');
           final FlutterSecureStorage secureStorage = FlutterSecureStorage();
           final String jsonString = jsonEncode(response.data);
           await secureStorage.write(key: 'Entities_List', value: jsonString);
@@ -277,7 +282,7 @@ class GmailSSO {
             );
           }
         } else {
-          debugPrint('Multiple Entities');
+          sdkLogDebug('gmail', 'multiple entities, routing home');
           final FlutterSecureStorage secureStorage = FlutterSecureStorage();
           final String jsonString = jsonEncode(response.data);
           await secureStorage.write(key: 'Entities_List', value: jsonString);
@@ -291,14 +296,15 @@ class GmailSSO {
           }
         }
       } else {
-        debugPrint('Backend error: ${response.statusCode} ${response.data}');
+        sdkLogWarning(
+          'gmail',
+          '/auth failed: status=${response.statusCode}',
+        );
       }
-    } catch (e) {
-      debugPrint('Error sending tokens to backend: $e');
-      if (e is DioException) {
-        debugPrint('Request data: ${e.requestOptions.data}');
-        debugPrint('Response data: ${e.response?.data}');
-      }
+    } on DioException catch (e, st) {
+      sdkLogError('gmail', dioErrorSummary(e), error: e, stackTrace: st);
+    } catch (e, st) {
+      sdkLogError('gmail', 'sendToBackend failed', error: e, stackTrace: st);
     }
   }
 
@@ -337,14 +343,15 @@ class GmailSSO {
           context.goNamed('/');
         }
       } else {
-        debugPrint('Backend error: ${response.statusCode} ${response.data}');
+        sdkLogWarning(
+          'gmail',
+          '/aud failed: status=${response.statusCode}',
+        );
       }
-    } catch (e) {
-      debugPrint('Error sending tokens to backend: $e');
-      if (e is DioException) {
-        debugPrint('Request data: ${e.requestOptions.data}');
-        debugPrint('Response data: ${e.response?.data}');
-      }
+    } on DioException catch (e, st) {
+      sdkLogError('gmail', dioErrorSummary(e), error: e, stackTrace: st);
+    } catch (e, st) {
+      sdkLogError('gmail', 'getJwtFromBackend failed', error: e, stackTrace: st);
     }
   }
 }

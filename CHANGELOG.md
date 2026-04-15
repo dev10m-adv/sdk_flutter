@@ -1,5 +1,6 @@
 ## 0.2.0
 
+* **Logging:** Replaced `print` / `debugPrint` with `dart:developer` logging via `lib/src/sdk_log.dart`. Namespaces are `uids_io_sdk_flutter.<auth|gmail|token|device>`. Debug-only traces use `sdkLogDebug` / `sdkLogInfo` (suppressed in release). Failures use `sdkLogWarning` / `sdkLogError`. Dio HTTP failures log `dioErrorSummary` (method, URL, status, type) — **not** request/response bodies, to avoid leaking tokens.
 * Added `lib/models/sdk_outputs.dart`: canonical response DTOs `TenantBinding`, `AuthEntitiesResponse`, `AudTokenResponse`, `RefreshTokenResponse`, `DeviceRegistrationResponse` (Dart `lowerCamelCase` fields; parsers accept snake_case / PascalCase from the server).
 * `AuthResponseModel` now builds on `AuthEntitiesResponse` and exposes `asCanonical`; `Entity` wraps `TenantBinding` for backward compatibility (`Authorization` / `authorizations` unchanged).
 * `AuthTokenModel.fromJson` delegates to `AudTokenResponse`; added `asAudTokenResponse`.

@@ -6,13 +6,14 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uids_io_sdk_flutter/configuration.dart';
 import 'package:uids_io_sdk_flutter/models/sdk_outputs.dart';
+import 'package:uids_io_sdk_flutter/src/sdk_log.dart';
 
 class RegisterService {
   static final Dio _dio = Dio();
   static final String authUrl = Configuration.AuthUrl;
 
   static Future<void> registerDeviceData() async {
-    print('Registering device...');
+    sdkLogInfo('device', 'registerDeviceData started');
     String deviceType;
     String devicePlatform;
     String deviceToken = await getDeviceToken();
@@ -47,8 +48,8 @@ class RegisterService {
     };
     try {
       await registerDevice(data);
-    } catch (e) {
-      print('Error during device registration: $e');
+    } catch (e, st) {
+      sdkLogError('device', 'registerDeviceData failed', error: e, stackTrace: st);
     }
   }
 
@@ -69,8 +70,10 @@ class RegisterService {
         );
         final FlutterSecureStorage secureStorage = FlutterSecureStorage();
         if (parsed.audDomain != Configuration.AudDomain) {
-          print(
-            'Please update AudDomain from ${Configuration.AudDomain} to ${parsed.audDomain}',
+          sdkLogWarning(
+            'device',
+            'AudDomain mismatch: Configuration.AudDomain=${Configuration.AudDomain} '
+            'server=${parsed.audDomain}',
           );
         }
         await secureStorage.write(
@@ -81,11 +84,22 @@ class RegisterService {
           final jsonString = jsonEncode(parsed.configurations);
           await secureStorage.write(key: "Configurations", value: jsonString);
         }
+        sdkLogDebug('device', 'registerdevice ok deviceId=${parsed.deviceId}');
       } else {
-        print('Failed to register device: ${response.statusCode} ${response.data}');
+        sdkLogWarning(
+          'device',
+          'registerdevice failed: status=${response.statusCode}',
+        );
       }
-    } catch (e) {
-      print('Error registering device: $e');
+    } on DioException catch (e, st) {
+      sdkLogError(
+        'device',
+        dioErrorSummary(e),
+        error: e,
+        stackTrace: st,
+      );
+    } catch (e, st) {
+      sdkLogError('device', 'register device failed', error: e, stackTrace: st);
     }
   }
 }

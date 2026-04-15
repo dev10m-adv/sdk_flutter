@@ -1,12 +1,13 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uids_io_sdk_flutter/configuration.dart';
-import 'package:flutter/material.dart';
 import 'package:uids_io_sdk_flutter/gmail_sso.dart';
 import 'package:uids_io_sdk_flutter/models/auth_response_model.dart';
+import 'package:uids_io_sdk_flutter/src/sdk_log.dart';
 
 Future<void> loginWithCredentials(String email, String password) async {
   Dio dio = Dio();
@@ -32,13 +33,15 @@ Future<void> loginWithCredentials(String email, String password) async {
       throw response.data['message'] ?? 'Registration failed';
     }
   } on DioException catch (e) {
+    sdkLogWarning('auth', dioErrorSummary(e));
     String errorMessage = 'Error during login';
     if (e.response != null && e.response?.data != null) {
       errorMessage = e.response?.data['message'] ?? errorMessage;
     }
-    throw errorMessage; // Throw only the error message
-  } catch (e) {
-    throw 'Error during login'; // Catch any other unknown errors
+    throw errorMessage;
+  } catch (e, st) {
+    sdkLogError('auth', 'login failed (non-Dio)', error: e, stackTrace: st);
+    throw 'Error during login';
   }
 }
 
@@ -70,13 +73,15 @@ Future<void> registerUser(String username, String email, String password,
       throw response.data['message'] ?? 'Registration failed';
     }
   } on DioException catch (e) {
+    sdkLogWarning('auth', dioErrorSummary(e));
     String errorMessage = 'Error during registration';
     if (e.response != null && e.response?.data != null) {
       errorMessage = e.response?.data['message'] ?? errorMessage;
     }
-    throw errorMessage; // Throw only the error message
-  } catch (e) {
-    throw 'Error during registration'; // Catch any other unknown errors
+    throw errorMessage;
+  } catch (e, st) {
+    sdkLogError('auth', 'registration failed (non-Dio)', error: e, stackTrace: st);
+    throw 'Error during registration';
   }
 }
 
@@ -185,17 +190,18 @@ Future<void> verifyOtp(
     if (response.statusCode == 200) {
       final FlutterSecureStorage secureStorage = FlutterSecureStorage();
       await secureStorage.delete(key: "opt_access_token");
-      print('Response from backend: ${response.data}');
       final responseData = AuthResponseModel.fromJson(response.data);
-      print('ErrorDetails: ${responseData.errorDetails}');
-      print('Username: ${responseData.username}');
-      print('idpname: ${responseData.idpname_backend}');
-      print('Entities: ${responseData.entities}');
-      print('Entities Length: ${responseData.entities.length}');
+      sdkLogDebug(
+        'auth',
+        'otpverify ok: entities=${responseData.entities.length} '
+        'idp=${responseData.idpname_backend} user=${responseData.username}',
+      );
       if (responseData.entities.length == 1) {
         final entityDta = responseData.entities[0];
-        print('Single Entity tenant: ${entityDta.tenant}');
-        print('Single Entity refreshtoken: ${entityDta.refreshToken}');
+        sdkLogDebug(
+          'auth',
+          'single entity tenant=${entityDta.tenant}',
+        );
 
         String jsonString = jsonEncode(response.data);
         await secureStorage.write(key: "Entities_List", value: jsonString);
@@ -204,7 +210,7 @@ Future<void> verifyOtp(
         GmailSSO.getJwtFromBackend(responseData.username,responseData.idpname_backend, entityDta.tenant,
             entityDta.refreshToken, deviceId ?? '', context);
       } else {
-        print('Multiple Entities');
+        sdkLogDebug('auth', 'multiple entities, routing to home');
         String jsonString = jsonEncode(response.data);
         await secureStorage.write(key: "Entities_List", value: jsonString);
         await secureStorage.delete(key: "JWT_Token");
@@ -215,13 +221,14 @@ Future<void> verifyOtp(
       throw response.data['message'] ?? 'Error during OTP verification';
     }
   } on DioException catch (e) {
+    sdkLogWarning('auth', dioErrorSummary(e));
     String errorMessage = 'Error during OTP verification';
     if (e.response != null && e.response?.data != null) {
       errorMessage = e.response?.data['message'] ?? errorMessage;
     }
-    throw errorMessage; // Throw only the error message
-  } catch (e) { // Catch any other unknown errors
-     print('Error during OTP verification: $e');
+    throw errorMessage;
+  } catch (e, st) {
+    sdkLogError('auth', 'otp verification failed', error: e, stackTrace: st);
     throw Exception('Error during OTP verification');
   }
 

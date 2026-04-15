@@ -89,6 +89,10 @@ Use `loginWithCredentials`, `registerUser`, `GmailSSO`, `RefreshTokenService`, `
 - **Desktop / Google** – Linux, macOS, and Windows use an embedded OAuth flow (`flutter_inappwebview`) toward your configured redirect URI.
 - **Host header** – Your auth server may resolve tenant/app config from the request `Host`. When testing locally, keep the host consistent with what your backend expects.
 
+## Logging
+
+Diagnostics use [`dart:developer` `log`](https://api.dart.dev/stable/dart-developer/log.html) with names like `uids_io_sdk_flutter.auth`, `uids_io_sdk_flutter.gmail`, `uids_io_sdk_flutter.token`, and `uids_io_sdk_flutter.device`. Routine traces (`sdkLogDebug` / `sdkLogInfo`) are **skipped in release** builds. Warnings and errors are logged in all builds. HTTP failures record a **safe summary** (method, URL, status, error type) via `dioErrorSummary`; request and response **bodies are not logged**, so tokens and passwords are not written to the console.
+
 ## Exports
 
 The main library is `uids_io_sdk_flutter.dart`. It re-exports services, models, auth helpers, `Configuration`, and `gmail_sso.dart`. Import it once:

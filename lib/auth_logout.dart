@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uids_io_sdk_flutter/src/sdk_log.dart';
 
 class AuthLogout extends StatelessWidget {
   const AuthLogout({super.key});
@@ -11,7 +12,7 @@ class AuthLogout extends StatelessWidget {
     await secureStorage.delete(key: "JWT_Token");
     await secureStorage.delete(key: "Username");
     await secureStorage.delete(key: "DatabaseName");
-    print('Logged out');
+    sdkLogInfo('auth', 'user logged out, storage cleared');
     if (context.mounted) {
       context.goNamed('/auth');
     }
