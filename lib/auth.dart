@@ -17,7 +17,7 @@ Future<void> loginWithCredentials(String email, String password) async {
     final response = await dio.post(
       url,
       data: {
-        'email': email,// change this to username
+        'email': email, // change this to username
         'password': password,
       },
     );
@@ -45,8 +45,12 @@ Future<void> loginWithCredentials(String email, String password) async {
   }
 }
 
-Future<void> registerUser(String username, String email, String password,
-    BuildContext context) async {
+Future<void> registerUser(
+  String username,
+  String email,
+  String password,
+  BuildContext context,
+) async {
   Dio dio = Dio();
   final String authUrl = Configuration.AuthUrl;
   final String url = '$authUrl/register';
@@ -54,11 +58,7 @@ Future<void> registerUser(String username, String email, String password,
   try {
     final response = await dio.post(
       url,
-      data: {
-        'username': username,
-        'email': email,
-        'password': password,
-      },
+      data: {'username': username, 'email': email, 'password': password},
     );
 
     if (response.statusCode == 200) {
@@ -80,13 +80,21 @@ Future<void> registerUser(String username, String email, String password,
     }
     throw errorMessage;
   } catch (e, st) {
-    sdkLogError('auth', 'registration failed (non-Dio)', error: e, stackTrace: st);
+    sdkLogError(
+      'auth',
+      'registration failed (non-Dio)',
+      error: e,
+      stackTrace: st,
+    );
     throw 'Error during registration';
   }
 }
 
 void _showQrCodePopup(
-    BuildContext context, String qrCodeDataURL, String accessToken) {
+  BuildContext context,
+  String qrCodeDataURL,
+  String accessToken,
+) {
   TextEditingController pinController = TextEditingController();
   bool isPinCorrect = false; // Flag to track pin validity
 
@@ -104,7 +112,8 @@ void _showQrCodePopup(
             Image.network(qrCodeDataURL), // Directly display the image from URL
             const SizedBox(height: 20),
             const Text(
-                'Scan this QR code for verification or further actions.'),
+              'Scan this QR code for verification or further actions.',
+            ),
             const SizedBox(height: 20),
             // Input field for 6-digit pin
             TextField(
@@ -140,14 +149,16 @@ void _showQrCodePopup(
                   // Show error message if OTP verification fails
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Invalid pin, please try again')),
+                      content: Text('Invalid pin, please try again'),
+                    ),
                   );
                 }
               } else {
                 // Show an error message if pin is incorrect
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Invalid pin, please try again')),
+                    content: Text('Invalid pin, please try again'),
+                  ),
                 );
               }
             },
@@ -168,10 +179,13 @@ void _showQrCodePopup(
 }
 
 Future<void> verifyOtp(
-    String otp, String accessToken, BuildContext context) async {
+  String otp,
+  String accessToken,
+  BuildContext context,
+) async {
   Dio dio = Dio();
   final String authUrl = Configuration.AuthUrl;
-  final String url = '$authUrl/otpverify';
+  final String url = '$authUrl/otpVerify';
 
   try {
     final response = await dio.post(
@@ -193,28 +207,37 @@ Future<void> verifyOtp(
       final responseData = AuthResponseModel.fromJson(response.data);
       sdkLogDebug(
         'auth',
-        'otpverify ok: entities=${responseData.entities.length} '
-        'idp=${responseData.idpname_backend} user=${responseData.username}',
+        'otpVerify ok: entities=${responseData.entities.length} '
+            'idp=${responseData.idpname_backend} user=${responseData.username}',
       );
       if (responseData.entities.length == 1) {
         final entityDta = responseData.entities[0];
-        sdkLogDebug(
-          'auth',
-          'single entity tenant=${entityDta.tenant}',
-        );
+        sdkLogDebug('auth', 'single entity tenant=${entityDta.tenant}');
 
         String jsonString = jsonEncode(response.data);
         await secureStorage.write(key: "Entities_List", value: jsonString);
-        await secureStorage.write(key: "idpname_backend", value: responseData.idpname_backend);
+        await secureStorage.write(
+          key: "idpname_backend",
+          value: responseData.idpname_backend,
+        );
         String? deviceId = await secureStorage.read(key: "DeviceId");
-        GmailSSO.getJwtFromBackend(responseData.username,responseData.idpname_backend, entityDta.tenant,
-            entityDta.refreshToken, deviceId ?? '', context);
+        GmailSSO.getJwtFromBackend(
+          responseData.username,
+          responseData.idpname_backend,
+          entityDta.tenant,
+          entityDta.refreshToken,
+          deviceId ?? '',
+          context,
+        );
       } else {
         sdkLogDebug('auth', 'multiple entities, routing to home');
         String jsonString = jsonEncode(response.data);
         await secureStorage.write(key: "Entities_List", value: jsonString);
         await secureStorage.delete(key: "JWT_Token");
-        await secureStorage.write(key: "idpname_backend", value: responseData.idpname_backend);
+        await secureStorage.write(
+          key: "idpname_backend",
+          value: responseData.idpname_backend,
+        );
         context.goNamed('/');
       }
     } else {
@@ -231,5 +254,4 @@ Future<void> verifyOtp(
     sdkLogError('auth', 'otp verification failed', error: e, stackTrace: st);
     throw Exception('Error during OTP verification');
   }
-
 }

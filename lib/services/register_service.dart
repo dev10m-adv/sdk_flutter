@@ -49,19 +49,22 @@ class RegisterService {
     try {
       await registerDevice(data);
     } catch (e, st) {
-      sdkLogError('device', 'registerDeviceData failed', error: e, stackTrace: st);
+      sdkLogError(
+        'device',
+        'registerDeviceData failed',
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 
   static Future<void> registerDevice(Map<String, dynamic> data) async {
-    final String url = '$authUrl/registerdevice';
+    final String url = '$authUrl/registerDevice';
     try {
       final response = await _dio.post(
         url,
         data: data,
-        options: Options(
-          headers: {'Content-Type': 'application/json'},
-        ),
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
       if (response.statusCode == 200 && response.data is Map) {
@@ -73,7 +76,7 @@ class RegisterService {
           sdkLogWarning(
             'device',
             'AudDomain mismatch: Configuration.AudDomain=${Configuration.AudDomain} '
-            'server=${parsed.audDomain}',
+                'server=${parsed.audDomain}',
           );
         }
         await secureStorage.write(
@@ -92,12 +95,7 @@ class RegisterService {
         );
       }
     } on DioException catch (e, st) {
-      sdkLogError(
-        'device',
-        dioErrorSummary(e),
-        error: e,
-        stackTrace: st,
-      );
+      sdkLogError('device', dioErrorSummary(e), error: e, stackTrace: st);
     } catch (e, st) {
       sdkLogError('device', 'register device failed', error: e, stackTrace: st);
     }
@@ -113,9 +111,10 @@ Future<String> getDeviceToken() async {
   if (storedToken != null) {
     return storedToken;
   } else {
-    String newToken =
-        List.generate(10, (index) => chars[random.nextInt(chars.length)])
-            .join();
+    String newToken = List.generate(
+      10,
+      (index) => chars[random.nextInt(chars.length)],
+    ).join();
     await storage.write(key: 'DeviceToken', value: newToken);
     return newToken;
   }
