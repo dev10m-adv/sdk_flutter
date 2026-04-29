@@ -1,12 +1,25 @@
 ## 0.2.0
 
+* **Breaking (wire JSON):** Aligned with AdvComm AuthAPI **camelCase** only (no PascalCase/snake aliases in SDK parsers).
+
+  **Requests**
+
+  | Endpoint | Changed |
+  |----------|---------|
+  | `POST /auth` | `AzureTokenInputModel` sends `accessToken`, `idpName`, `tokenType`. |
+  | `POST /aud` | `AudModel` sends `username`, `tenant`, `refreshToken`, `deviceId`, `idpName`. |
+  | `POST /refresh` | Body uses `refreshToken`, `username`. |
+
+  **Responses**
+
+  - `TenantBinding`: `tenant`, **`refreshToken`**, **`authorizations.roles`** (no `refresh_token` / `refreshtoken`).
+  - `AuthEntitiesResponse`: **`entities`**, `username`, `idpName`, `errorDetails` (no `Entities`/`Username`/… mixes).
+  - `AudTokenResponse` / `/refresh`: JWT in **`token`**, refresh in **`refreshToken`**; optional **`isSuccess`** on `/aud`.
+  - `DeviceRegistrationResponse`: **`isSuccess`**, **`deviceId`**, **`audDomain`**, **`configurations`**.
+
+  If persisted DB rows emit snake_case, normalize JSON in AuthAPI **before** `res.json`; the SDK expects camelCase UID objects.
+
 * **Logging:** Replaced `print` / `debugPrint` with `dart:developer` logging via `lib/src/sdk_log.dart`. Namespaces are `uids_io_sdk_flutter.<auth|gmail|token|device>`. Debug-only traces use `sdkLogDebug` / `sdkLogInfo` (suppressed in release). Failures use `sdkLogWarning` / `sdkLogError`. Dio HTTP failures log `dioErrorSummary` (method, URL, status, type) — **not** request/response bodies, to avoid leaking tokens.
-* Added `lib/models/sdk_outputs.dart`: canonical response DTOs `TenantBinding`, `AuthEntitiesResponse`, `AudTokenResponse`, `RefreshTokenResponse`, `DeviceRegistrationResponse` (Dart `lowerCamelCase` fields; parsers accept snake_case / PascalCase from the server).
-* `AuthResponseModel` now builds on `AuthEntitiesResponse` and exposes `asCanonical`; `Entity` wraps `TenantBinding` for backward compatibility (`Authorization` / `authorizations` unchanged).
-* `AuthTokenModel.fromJson` delegates to `AudTokenResponse`; added `asAudTokenResponse`.
-* `RegisterService` / `RefreshTokenService` parse responses with `DeviceRegistrationResponse` / `RefreshTokenResponse`.
-* `AudModel` uses `idpName` instead of `idpname_backend` in the constructor (deprecated getter kept).
-* Package barrel exports `sdk_outputs.dart`.
 
 ## 0.1.0
 

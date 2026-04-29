@@ -1,3 +1,4 @@
+/// Request body for `POST /auth` — AdvComm camelCase (`accessToken`, `idpName`, `tokenType`).
 class AzureTokenInputModel {
   final String accessToken;
   final String idpName;
@@ -11,18 +12,17 @@ class AzureTokenInputModel {
 
   factory AzureTokenInputModel.fromJson(Map<String, dynamic> json) {
     return AzureTokenInputModel(
-      accessToken: json['AccessToken'] ?? '',
-      idpName: json['idpName'] ?? '',
-      tokenType: json['tokenType'],
+      accessToken: json['accessToken'] as String? ?? '',
+      idpName: json['idpName'] as String? ?? '',
+      tokenType: json['tokenType'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'AccessToken': accessToken,
+      'accessToken': accessToken,
       'idpName': idpName,
       if (tokenType != null) 'tokenType': tokenType,
     };
   }
 }
-

@@ -1,8 +1,7 @@
-/// Stable, versioned response shapes for AdvComm Auth API consumers.
+/// Response DTOs for AdvComm Auth API (camelCase JSON, matching Express `res.json`).
 ///
-/// Parse server JSON with [AuthEntitiesResponse.fromJson], [AudTokenResponse.fromJson],
-/// etc. Field names here use Dart conventions (`accessToken`); wire JSON may use
-/// `Token`, `refresh_token`, etc. — factories normalize both.
+/// Servers must send lowercase/camelCase wire keys (`token`, `refreshToken`,
+/// `entities`, …). Parsing does not accept legacy PascalCase/snake mixes.
 library;
 
 // --- Helpers -----------------------------------------------------------------
@@ -16,23 +15,23 @@ int _int(dynamic v) {
   return int.tryParse('$v') ?? 0;
 }
 
+bool _bool(dynamic v, [bool fallback = false]) {
+  if (v is bool) return v;
+  return fallback;
+}
+
 Map<String, dynamic> _map(dynamic v) {
   if (v is Map<String, dynamic>) return v;
   if (v is Map) return Map<String, dynamic>.from(v);
   return {};
 }
 
-// --- POST /auth, OTP verify (UserEntities body) ------------------------------
+// --- POST /auth, POST /otpVerify (UserEntities body) --------------------------
 
-/// One tenant row for the signed-in subject (matches `GetUIDsBySubjectUIDAndAppPortalID`).
+/// One UID / tenant row for the signed-in subject.
 class TenantBinding {
-  /// Tenant owner email (`users.user_name` for `tenant_id`).
   final String tenant;
-
-  /// Role names from `authorizations.roles`.
   final List<String> roles;
-
-  /// Hex-encoded refresh token for this portal + tenant row.
   final String refreshToken;
 
   const TenantBinding({
@@ -50,28 +49,21 @@ class TenantBinding {
     return TenantBinding(
       tenant: _str(json['tenant']),
       roles: roles,
-      refreshToken: _str(json['refresh_token'] ?? json['refreshtoken']),
+      refreshToken: _str(json['refreshToken']),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'tenant': tenant,
-        'roles': roles,
-        'refreshToken': refreshToken,
-      };
+    'tenant': tenant,
+    'refreshToken': refreshToken,
+    'authorizations': {'roles': roles},
+  };
 }
 
-/// Successful or error payload from `POST /auth` and `POST /otpverify` (200 body).
 class AuthEntitiesResponse {
-  /// Empty when the login succeeded; otherwise a human-readable error.
   final String errorDetails;
-
   final String username;
-
-  /// IdP label used for this flow (e.g. `Gmail`, `Email`).
   final String idpName;
-
-  /// Tenant rows for this subject + portal (may be empty on error).
   final List<TenantBinding> entities;
 
   bool get isSuccess => errorDetails.isEmpty;
@@ -84,31 +76,31 @@ class AuthEntitiesResponse {
   });
 
   factory AuthEntitiesResponse.fromJson(Map<String, dynamic> json) {
-    final raw = json['Entities'] ?? json['entities'];
+    final raw = json['entities'];
     final list = raw is List ? raw : const [];
     return AuthEntitiesResponse(
-      errorDetails: _str(json['ErrorDetails'] ?? json['errorDetails']),
-      username: _str(json['Username'] ?? json['username']),
-      idpName: _str(json['idpname'] ?? json['idpName']),
+      errorDetails: _str(json['errorDetails']),
+      username: _str(json['username']),
+      idpName: _str(json['idpName']),
       entities: list.map((e) {
-        final m = _map(e);
-        return TenantBinding.fromJson(m);
+        return TenantBinding.fromJson(_map(e));
       }).toList(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'errorDetails': errorDetails,
-        'username': username,
-        'idpName': idpName,
-        'entities': entities.map((e) => e.toJson()).toList(),
-      };
+    'errorDetails': errorDetails,
+    'username': username,
+    'idpName': idpName,
+    'entities': entities.map((e) => e.toJson()).toList(),
+  };
 }
 
-// --- POST /aud ---------------------------------------------------------------
+// --- POST /aud ----------------------------------------------------------------
 
-/// JWT + refresh bundle from `POST /aud`.
+/// JWT access token + portal refresh token from `POST /aud`.
 class AudTokenResponse {
+  /// JWT access token (`token` on the wire — same semantics as OAuth “access”).
   final String accessToken;
   final String refreshToken;
   final bool isSuccess;
@@ -121,22 +113,22 @@ class AudTokenResponse {
 
   factory AudTokenResponse.fromJson(Map<String, dynamic> json) {
     return AudTokenResponse(
-      accessToken: _str(json['Token'] ?? json['token']),
-      refreshToken: _str(json['RefreshToken'] ?? json['refresh_token']),
-      isSuccess: json['IsSuccess'] as bool? ?? true,
+      accessToken: _str(json['token']),
+      refreshToken: _str(json['refreshToken']),
+      isSuccess: _bool(json['isSuccess'], true),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'accessToken': accessToken,
-        'refreshToken': refreshToken,
-        'isSuccess': isSuccess,
-      };
+    'token': accessToken,
+    'refreshToken': refreshToken,
+    'isSuccess': isSuccess,
+  };
 }
 
-// --- POST /refresh -----------------------------------------------------------
+// --- POST /refresh -------------------------------------------------------------
 
-/// New JWT + refresh from `POST /refresh`.
+/// New JWT + refresh bundle from `POST /refresh`.
 class RefreshTokenResponse {
   final String accessToken;
   final String refreshToken;
@@ -148,46 +140,47 @@ class RefreshTokenResponse {
 
   factory RefreshTokenResponse.fromJson(Map<String, dynamic> json) {
     return RefreshTokenResponse(
-      accessToken: _str(json['Token'] ?? json['token']),
-      refreshToken: _str(json['RefreshToken'] ?? json['refresh_token']),
+      accessToken: _str(json['token']),
+      refreshToken: _str(json['refreshToken']),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'accessToken': accessToken,
-        'refreshToken': refreshToken,
-      };
+    'token': accessToken,
+    'refreshToken': refreshToken,
+  };
 }
 
-// --- POST /registerdevice ----------------------------------------------------
+// --- POST /registerDevice ------------------------------------------------------
 
-/// Result of `POST /registerdevice`.
 class DeviceRegistrationResponse {
+  final bool isSuccess;
   final int deviceId;
   final String audDomain;
-
-  /// Raw rows from `getappconfiguration` / `GetAppConfiguration` (keys may be snake_case).
   final List<Map<String, dynamic>> configurations;
 
   const DeviceRegistrationResponse({
+    required this.isSuccess,
     required this.deviceId,
     required this.audDomain,
     required this.configurations,
   });
 
   factory DeviceRegistrationResponse.fromJson(Map<String, dynamic> json) {
-    final raw = json['Configurations'] ?? json['configurations'];
+    final raw = json['configurations'];
     final list = raw is List ? raw : const [];
     return DeviceRegistrationResponse(
-      deviceId: _int(json['DeviceId'] ?? json['deviceId']),
-      audDomain: _str(json['AudDomain'] ?? json['audDomain']),
+      isSuccess: _bool(json['isSuccess'], false),
+      deviceId: _int(json['deviceId']),
+      audDomain: _str(json['audDomain']),
       configurations: list.map((e) => _map(e)).toList(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'deviceId': deviceId,
-        'audDomain': audDomain,
-        'configurations': configurations,
-      };
+    'isSuccess': isSuccess,
+    'deviceId': deviceId,
+    'audDomain': audDomain,
+    'configurations': configurations,
+  };
 }

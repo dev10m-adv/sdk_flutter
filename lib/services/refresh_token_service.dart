@@ -63,9 +63,9 @@ class RefreshTokenService {
     try {
       final response = await _dio.post(
         _refreshUrl,
-        data: {
-          'RefreshToken': refreshToken,
-          'Username': username,
+        data: <String, dynamic>{
+          'refreshToken': refreshToken,
+          'username': username,
         },
       );
 

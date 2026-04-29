@@ -1,11 +1,9 @@
-/// Request body for `POST /aud` (wire format uses PascalCase keys in [toJson]).
+/// Request body for `POST /aud` — AdvComm camelCase.
 class AudModel {
   final String username;
   final String tenant;
   final String refreshToken;
   final String deviceId;
-
-  /// IdP name (e.g. `Gmail`, `Email`).
   final String idpName;
 
   @Deprecated('Use idpName')
@@ -21,21 +19,21 @@ class AudModel {
 
   factory AudModel.fromJson(Map<String, dynamic> json) {
     return AudModel(
-      username: json['Username'] ?? '',
-      idpName: json['IdpName'] ?? '',
-      tenant: json['Tenant'] ?? '',
-      refreshToken: json['RefreshToken'] ?? '',
-      deviceId: json['DeviceID'] ?? '',
+      username: json['username'] as String? ?? '',
+      idpName: json['idpName'] as String? ?? '',
+      tenant: json['tenant'] as String? ?? '',
+      refreshToken: json['refreshToken'] as String? ?? '',
+      deviceId: json['deviceId'] as String? ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'Username': username,
-      'IdpName': idpName,
-      'Tenant': tenant,
-      'RefreshToken': refreshToken,
-      'DeviceID': deviceId,
+      'username': username,
+      'tenant': tenant,
+      'refreshToken': refreshToken,
+      'deviceId': deviceId,
+      'idpName': idpName,
     };
   }
 }

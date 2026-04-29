@@ -71,6 +71,9 @@ class RegisterService {
         final parsed = DeviceRegistrationResponse.fromJson(
           Map<String, dynamic>.from(response.data as Map),
         );
+        if (!parsed.isSuccess) {
+          sdkLogWarning('device', 'registerDevice returned isSuccess=false');
+        }
         final FlutterSecureStorage secureStorage = FlutterSecureStorage();
         if (parsed.audDomain != Configuration.AudDomain) {
           sdkLogWarning(
