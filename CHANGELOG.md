@@ -1,6 +1,6 @@
 ## 0.2.0
 
-* **Breaking (wire JSON):** Aligned with AdvComm AuthAPI **camelCase** only (no PascalCase/snake aliases in SDK parsers).
+* **Breaking (wire JSON):** Aligned AdvComm AuthAPI **camelCase** for outbound bodies and canonical responses; exception: **`TenantBinding`** parses **`refresh_token`** on **`entities[]`** rows when PG JSON retains snake_case.
 
   **Requests**
 
@@ -12,7 +12,7 @@
 
   **Responses**
 
-  - `TenantBinding`: `tenant`, **`refreshToken`**, **`authorizations.roles`** (no `refresh_token` / `refreshtoken`).
+  - `TenantBinding`: **`tenant`**, **`authorizations.roles`**, **`refreshToken`** preferred; also accepts DB-style **`refresh_token`** (see [`UserEntity`](../AuthAPI/src/types/common.ts) in AuthAPI).
   - `AuthEntitiesResponse`: **`entities`**, `username`, `idpName`, `errorDetails` (no `Entities`/`Username`/… mixes).
   - `AudTokenResponse` / `/refresh`: JWT in **`token`**, refresh in **`refreshToken`**; optional **`isSuccess`** on `/aud`.
   - `DeviceRegistrationResponse`: **`isSuccess`**, **`deviceId`**, **`audDomain`**, **`configurations`**.

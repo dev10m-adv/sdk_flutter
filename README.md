@@ -85,7 +85,7 @@ Use `loginWithCredentials`, `registerUser`, `GmailSSO`, `RefreshTokenService`, `
 
 ### JSON conventions
 
-Request and response bodies use **camelCase** keys aligned with AdvComm AuthAPI (e.g. `accessToken` on `POST /auth`, `refreshToken`, `username` on `POST /refresh`, `token` + `refreshToken` from `/aud` and `/refresh`). Tenant rows in `entities` use `refreshToken` and nested `authorizations.roles`.
+Request and response bodies align with **`AuthAPI`** TypeScript types (e.g. `LoginRequest` uses `email` + `password`; `POST /auth` body matches [`AuthRequest`](../AuthAPI/src/types/auth.ts): `accessToken`, `idpName`, optional `tokenType`; `/aud`, `/refresh`, `/registerDevice` match their DTOs). JSON uses camelCase (`token`, `refreshToken`, `entities`). Tenant rows in `entities[]` may still expose DB-style **`refresh_token`** alongside camelCase — the SDK parses both.
 
 ## Platform notes
 

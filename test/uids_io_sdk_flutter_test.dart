@@ -29,6 +29,24 @@ void main() {
     expect(r.entities.single.roles, ['all']);
   });
 
+  test('AuthEntitiesResponse parses entities row with snake_case refresh_token', () {
+    final r = AuthEntitiesResponse.fromJson({
+      'errorDetails': '',
+      'username': 'a@b.com',
+      'idpName': 'Gmail',
+      'entities': [
+        {
+          'tenant': 't@en.ant',
+          'authorizations': {
+            'roles': ['all'],
+          },
+          'refresh_token': 'tok-from-db-row',
+        },
+      ],
+    });
+    expect(r.entities.single.refreshToken, 'tok-from-db-row');
+  });
+
   test('AudTokenResponse parses camelCase /aud body', () {
     final t = AudTokenResponse.fromJson({
       'token': 'jwt',

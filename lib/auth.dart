@@ -14,10 +14,11 @@ Future<void> loginWithCredentials(String email, String password) async {
   final String authUrl = Configuration.AuthUrl;
   final String url = '$authUrl/login';
   try {
+    // AuthAPI LoginRequest (`types/auth.ts`): `email`, `password`.
     final response = await dio.post(
       url,
       data: {
-        'email': email, // change this to username
+        'email': email,
         'password': password,
       },
     );

@@ -29,6 +29,9 @@ Map<String, dynamic> _map(dynamic v) {
 // --- POST /auth, POST /otpVerify (UserEntities body) --------------------------
 
 /// One UID / tenant row for the signed-in subject.
+///
+/// AuthAPI returns these rows from DB procedures; wire keys may be camelCase
+/// (`refreshToken`) or snake_case (`refresh_token`) depending on driver/serialization.
 class TenantBinding {
   final String tenant;
   final List<String> roles;
@@ -46,10 +49,13 @@ class TenantBinding {
     if (auth is Map<String, dynamic>) {
       roles = List<String>.from(auth['roles'] ?? []);
     }
+    final rt = _str(json['refreshToken']);
+    final refreshToken =
+        rt.isNotEmpty ? rt : _str(json['refresh_token']);
     return TenantBinding(
       tenant: _str(json['tenant']),
       roles: roles,
-      refreshToken: _str(json['refreshToken']),
+      refreshToken: refreshToken,
     );
   }
 
