@@ -1,119 +1,87 @@
-# uids_io_sdk_flutter
+# UIDS Auth SDK for `uids_io_sdk_flutter`
 
-Flutter package for integrating **single sign-on (SSO)** with your auth backend: email/password, OTP, device registration, Google (Gmail) sign-in, token refresh, and optional UI widgets. 
-
-Targets **Web**, **Android**, **iOS**, and **desktop** (Linux, macOS, Windows).
+This package now exposes the new UIDS authentication SDK implementation while
+preserving the legacy package name `uids_io_sdk_flutter`.
 
 ## Features
 
-- **Configuration** – Point the SDK at your auth service via `Configuration.AuthUrl` and `AudDomain`.
-- **Device registration** – `RegisterService` registers the device and stores returned configuration (including IdP settings).
-- **Email auth** – Login, registration, and OTP verification (`auth.dart`) against your API.
-- **Google sign-in** – `GmailSSO` for Google OAuth; uses platform-appropriate flows (including GIS on web).
-- **Tokens** – JWT and refresh handling with `RefreshTokenService` and secure storage.
-- **Optional UI** – `AuthScreen`, `AuthButtons`, and `AuthLogout` for a quick integration with `go_router`.
-- **Stable response models** – `sdk_outputs.dart`: `AuthEntitiesResponse`, `TenantBinding`, `AudTokenResponse`, `RefreshTokenResponse`, `DeviceRegistrationResponse` — **camelCase JSON only**, matching AdvComm AuthAPI `res.json`. Legacy adapters (`AuthResponseModel`, `Entity`, `AuthTokenModel`) delegate to those DTOs.
+- Provider sign-in for Google and Microsoft
+- Backend token exchange and session management
+- Silent provider refresh and session refresh
+- Device registration as a separate flow
+- Secure storage-backed persistence
+- Zero bundled UI
 
-## Requirements
+## Package Identity
 
-| Requirement | Version |
-|-------------|---------|
-| Dart        | `^3.9.0` |
-| Flutter     | `>=3.35.0` |
-
-## Installation
-
-Add the dependency to your app’s `pubspec.yaml`:
+Use the old package name in your app dependency:
 
 ```yaml
 dependencies:
   uids_io_sdk_flutter: ^0.2.0
 ```
 
-Then run:
-
-```bash
-flutter pub get
-```
-
-## Quick start
-
-### 1. Configure endpoints
-
-Before calling any API, set your auth base URL (and optional AUD domain):
-
-```dart
-import 'package:uids_io_sdk_flutter/configuration.dart';
-
-void setupAuth() {
-  Configuration.AuthUrl = 'https://your-auth.example.com';
-  Configuration.AudDomain = 'https://your-auth.example.com';
-}
-```
-
-### 2. Register the device
-
-Call device registration early (for example after your app starts) so `DeviceId` and IdP **Configurations** are stored for SSO:
-
-```dart
-import 'package:uids_io_sdk_flutter/services/register_service.dart';
-
-// e.g. in main() after WidgetsFlutterBinding.ensureInitialized()
-await RegisterService.registerDeviceData();
-```
-
-### 3. Use the bundled auth UI (optional)
-
-The package exports `AuthScreen` and related widgets. Wire your app with a router (the SDK uses `go_router` for navigation after login):
-
-```dart
-import 'package:uids_io_sdk_flutter/auth_view.dart';
-
-// Example: use AuthScreen as your sign-in route widget
-AuthScreen(key: globalKey); // see package example/
-```
-
-### 4. Or integrate programmatically
-
-Import the barrel file for the public API:
+Import either public barrel:
 
 ```dart
 import 'package:uids_io_sdk_flutter/uids_io_sdk_flutter.dart';
 ```
 
-Use `loginWithCredentials`, `registerUser`, `GmailSSO`, `RefreshTokenService`, `AuthLogout`, etc., according to your flow.
+or:
 
-### JSON conventions
+```dart
+import 'package:uids_io_sdk_flutter/uids_auth_sdk.dart';
+```
 
-Request and response bodies align with **`AuthAPI`** TypeScript types (e.g. `LoginRequest` uses `email` + `password`; `POST /auth` body matches [`AuthRequest`](../AuthAPI/src/types/auth.ts): `accessToken`, `idpName`, optional `tokenType`; `/aud`, `/refresh`, `/registerDevice` match their DTOs). JSON uses camelCase (`token`, `refreshToken`, `entities`). Tenant rows in `entities[]` may still expose DB-style **`refresh_token`** alongside camelCase — the SDK parses both.
-
-## Platform notes
-
-- **Web / Google sign-in** – Recent `google_sign_in` versions use the Google Identity Services (GIS) button on web. The SDK shows a dialog with the official sign-in button when the user starts Google SSO; ensure your OAuth client and redirect URIs match your [Google Cloud Console](https://console.cloud.google.com/) setup.
-- **Desktop / Google** – Linux, macOS, and Windows use an embedded OAuth flow (`flutter_inappwebview`) toward your configured redirect URI.
-- **Host header** – Your auth server may resolve tenant/app config from the request `Host`. When testing locally, keep the host consistent with what your backend expects.
-
-## Logging
-
-Diagnostics use [`dart:developer` `log`](https://api.dart.dev/stable/dart-developer/log.html) with names like `uids_io_sdk_flutter.auth`, `uids_io_sdk_flutter.gmail`, `uids_io_sdk_flutter.token`, and `uids_io_sdk_flutter.device`. Routine traces (`sdkLogDebug` / `sdkLogInfo`) are **skipped in release** builds. Warnings and errors are logged in all builds. HTTP failures record a **safe summary** (method, URL, status, error type) via `dioErrorSummary`; request and response **bodies are not logged**, so tokens and passwords are not written to the console.
-
-## Exports
-
-The main library is `uids_io_sdk_flutter.dart`. It re-exports services, models, auth helpers, `Configuration`, and `gmail_sso.dart`. Import it once:
+## Quick Start
 
 ```dart
 import 'package:uids_io_sdk_flutter/uids_io_sdk_flutter.dart';
+
+final sdk = UidsAuthSdk.create();
+
+await sdk.initialize(
+  UidsSdkConfig(
+    apiBaseUrl: Uri.parse('https://api.example.com'),
+    authBaseUrl: Uri.parse('https://auth.example.com'),
+    clientId: 'backend-client-id',
+    audience: 'api-audience',
+    autoRefresh: true,
+    refreshBeforeExpiry: Duration(minutes: 5),
+    google: GoogleAuthConfig(
+      webClientId: 'google-web-client-id',
+      androidClientId: 'google-android-client-id',
+      iosClientId: 'google-ios-client-id',
+      desktopClientId: 'google-desktop-client-id',
+      desktopRedirectUri: 'http://localhost/',
+      useInstalledAppFlowOnDesktop: true,
+    ),
+    microsoft: MicrosoftAuthConfig(
+      clientId: 'microsoft-client-id',
+      tenantId: 'common',
+    ),
+  ),
+);
+
+final session = await sdk.signInWithProvider(
+  provider: AuthProvider.google,
+);
+
+final device = await sdk.ensureDeviceRegistered(
+  const DeviceRegisterRequest(
+    stableDeviceKey: 'your-stable-uuid',
+    platform: 'android',
+  ),
+);
 ```
 
-## Example
+## Architecture
 
-See the [`example/`](example/) folder for a minimal app that uses `AuthScreen`.
+The SDK separates authentication and device registration into two independent
+flows. Signing in does not register a device, and signing out does not clear a
+registered device unless you explicitly do so.
 
-## Links
+## Notes
 
-- **Repository:** [github.com/uids-io/sdk_flutter](https://github.com/uids-io/sdk_flutter)
-- **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
-
-## License
-
-See [LICENSE](LICENSE).
+- The previous bundled UI and legacy helper APIs are no longer part of the migrated SDK surface.
+- The old package name is preserved so existing dependency coordinates do not need to change.
