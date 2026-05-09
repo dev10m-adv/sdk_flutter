@@ -5,6 +5,11 @@
 /// - `package:uids_io_sdk_flutter/uids_auth_sdk.dart`
 library uids_auth_sdk;
 
+// Browser launcher
+export 'src/browser/auth_browser_launcher.dart';
+export 'src/browser/external_browser_launcher.dart';
+export 'src/browser/in_app_web_view_launcher.dart';
+
 // Config
 export 'src/config/github_auth_config.dart';
 export 'src/config/google_auth_config.dart';

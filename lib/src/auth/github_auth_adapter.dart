@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart' as launcher;
 
-import 'auth_callback_page.dart';
+import '../browser/auth_browser_launcher.dart';
+import '../browser/external_browser_launcher.dart';
 import '../config/github_auth_config.dart';
 import '../errors/uids_auth_exception.dart';
 import '../models/auth_provider.dart';
@@ -20,35 +19,32 @@ import 'provider_auth_adapter.dart';
 /// Implements the Authorization Code flow with PKCE directly — no third-party
 /// package required.
 ///
-/// ## Desktop (Windows / macOS / Linux)
-/// A transient HTTP loopback server receives the redirect callback.
-/// [GitHubAuthConfig.redirectUri] must be a loopback URL with an explicit
-/// port and path, e.g. `http://localhost:9100/auth`.
-///
-/// ## Mobile (Android / iOS)
-/// A custom-scheme deep link is used. Register the redirect URI scheme in
-/// your `AndroidManifest.xml` / `Info.plist`, then forward every incoming URI
-/// to [GitHubAuthAdapter.handleDeepLinkCallback] from your app's link handler
-/// (e.g. `app_links` / `uni_links` stream).
+/// The browser interaction is delegated to an [AuthBrowserLauncher]:
+/// - [ExternalBrowserLauncher] (default): opens the system browser.
+///   - Desktop: uses a transient HTTP loopback server.
+///   - Mobile: uses a custom-scheme deep link — register the redirect URI
+///     scheme in your `AndroidManifest.xml` / `Info.plist` and forward every
+///     incoming URI to [GitHubAuthAdapter.handleDeepLinkCallback].
+/// - [InAppWebViewLauncher]: shows an in-app WebView dialog on all platforms,
+///   removing the need for deep-link URI scheme registration on mobile.
 ///
 /// ## Refresh
-/// GitHub OAuth App tokens do not expire by default. When a refresh token is
+/// GitHub OAuth App tokens do not expire by default.  When a refresh token is
 /// present (GitHub Apps with token expiry enabled), [refresh] exchanges it
-/// silently. Otherwise the cached access token is returned as-is.
+/// silently.  Otherwise the cached access token is returned as-is.
 /// Tokens are **never** persisted to disk.
 ///
 /// ## GitHub and OIDC
-/// GitHub does not issue an ID token in the OAuth response. The access token
+/// GitHub does not issue an ID token in the OAuth response.  The access token
 /// is used in place of `idToken` in [ProviderAuthResult].
-///
-/// ## Thread safety
-/// A single adapter instance should not have concurrent [signIn] calls.
 final class GitHubAuthAdapter implements ProviderAuthAdapter {
   GitHubAuthAdapter({
     required GitHubAuthConfig config,
     http.Client? httpClient,
+    AuthBrowserLauncher? browserLauncher,
   }) : _config = config,
-       _http = httpClient ?? http.Client();
+       _http = httpClient ?? http.Client(),
+       _launcher = browserLauncher ?? const ExternalBrowserLauncher();
 
   static const _authorizeEndpoint = 'https://github.com/login/oauth/authorize';
   static const _tokenEndpoint = 'https://github.com/login/oauth/access_token';
@@ -58,38 +54,33 @@ final class GitHubAuthAdapter implements ProviderAuthAdapter {
 
   final GitHubAuthConfig _config;
   final http.Client _http;
+  final AuthBrowserLauncher _launcher;
 
-  // ── Static deep-link bridge (mobile) ─────────────────────────────────────
+  // ── Static deep-link bridge (backward compatibility) ──────────────────────
 
-  static final StreamController<Uri> _deepLinkController =
-      StreamController<Uri>.broadcast();
-
-  /// Forward deep-link URIs to the adapter on mobile.
+  /// Forward deep-link URIs from your app's link handler on mobile.
   ///
-  /// Call this from your app's link handler whenever a URI matching your
-  /// GitHub redirect scheme arrives:
+  /// This is a convenience delegate for [ExternalBrowserLauncher.handleDeepLinkCallback].
+  /// Only needed when using the default [ExternalBrowserLauncher] on mobile;
+  /// [InAppWebViewLauncher] intercepts the redirect inside the WebView and
+  /// does not require deep-link handling.
+  ///
   /// ```dart
   /// // e.g. with package:app_links
   /// _appLinks.uriLinkStream.listen(GitHubAuthAdapter.handleDeepLinkCallback);
   /// ```
-  static void handleDeepLinkCallback(Uri uri) => _deepLinkController.add(uri);
+  static void handleDeepLinkCallback(Uri uri) =>
+      ExternalBrowserLauncher.handleDeepLinkCallback(uri);
 
   // ── In-memory credential cache ────────────────────────────────────────────
 
-  /// Held in memory only — never persisted.
   String? _accessToken;
-
-  /// Present only when GitHub issued a refresh token (token expiry enabled).
   String? _refreshToken;
 
-  // ── Per-flow mutable state ────────────────────────────────────────────────
-
-  HttpServer? _redirectServer;
-  StreamSubscription<Uri>? _deepLinkSub;
-  Completer<Uri?>? _codeCompleter;
-  String? _expectedState;
-
-  bool get _isMobile => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+  bool get _isMobile =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   // ── ProviderAuthAdapter ───────────────────────────────────────────────────
 
@@ -98,46 +89,34 @@ final class GitHubAuthAdapter implements ProviderAuthAdapter {
 
   @override
   Future<ProviderAuthResult> signIn({List<String> scopes = const []}) async {
-    _expectedState = _randomUrlSafe(32);
+    final state = _randomUrlSafe(32);
     final effectiveScopes = _withDefaultScopes(scopes);
     final redirectUri = _resolveRedirectUri();
 
-    // PKCE is used on all platforms — GitHub supports S256.
     final verifier = _randomUrlSafe(64);
     final challenge = _s256Challenge(verifier);
 
+    final authUrl = Uri.parse(_authorizeEndpoint).replace(
+      queryParameters: <String, String>{
+        'client_id': _config.clientId,
+        'redirect_uri': redirectUri,
+        'scope': effectiveScopes.join(' '),
+        'state': state,
+        'code_challenge': challenge,
+        'code_challenge_method': 'S256',
+      },
+    );
+
     try {
-      if (_isMobile) {
-        await _setupDeepLinkListener();
-      } else {
-        await _setupLoopbackServer(redirectUri);
-      }
-
-      final authUrl = Uri.parse(_authorizeEndpoint).replace(
-        queryParameters: <String, String>{
-          'client_id': _config.clientId,
-          'redirect_uri': redirectUri,
-          'scope': effectiveScopes.join(' '),
-          'state': _expectedState!,
-          'code_challenge': challenge,
-          'code_challenge_method': 'S256',
-        },
+      final callbackUri = await _launcher.launch(
+        authUrl: authUrl,
+        redirectUri: Uri.parse(redirectUri),
+        timeout: _isMobile ? _mobileFlowTimeout : _desktopFlowTimeout,
       );
 
-      if (!await launcher.canLaunchUrl(authUrl)) {
+      if (callbackUri.queryParameters['state'] != state) {
         throw const UidsProviderSignInException(
-          'Could not open the system browser for GitHub sign-in.',
-        );
-      }
-      await launcher.launchUrl(
-        authUrl,
-        mode: launcher.LaunchMode.externalApplication,
-      );
-
-      final callbackUri = await _waitForCallback();
-      if (callbackUri == null) {
-        throw const UidsProviderCancelledException(
-          'GitHub sign-in timed out or was cancelled.',
+          'Invalid OAuth state in GitHub callback.',
         );
       }
 
@@ -151,8 +130,6 @@ final class GitHubAuthAdapter implements ProviderAuthAdapter {
       rethrow;
     } catch (e) {
       throw UidsProviderSignInException('GitHub sign-in failed.', cause: e);
-    } finally {
-      await _cleanup();
     }
   }
 
@@ -285,185 +262,21 @@ final class GitHubAuthAdapter implements ProviderAuthAdapter {
     }
 
     _accessToken = accessToken;
-
     final newRefreshToken = data['refresh_token'] as String?;
     if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
       _refreshToken = newRefreshToken;
     }
 
-    // GitHub returns scopes comma-separated in the JSON response.
     final scopeStr = (data['scope'] as String? ?? '').trim();
-    final grantedScopes = scopeStr.isEmpty
-        ? requestedScopes
-        : scopeStr.split(RegExp(r'[, ]+'));
+    final grantedScopes =
+        scopeStr.isEmpty ? requestedScopes : scopeStr.split(RegExp(r'[, ]+'));
 
     return ProviderAuthResult(
       provider: AuthProvider.github,
-      // GitHub OAuth does not issue an OIDC id_token; access_token is used instead.
       idToken: accessToken,
       accessToken: accessToken,
       scopes: grantedScopes,
     );
-  }
-
-  // ── Desktop: HTTP loopback server ─────────────────────────────────────────
-
-  Future<void> _setupLoopbackServer(String redirectUriStr) async {
-    final redirectUri = Uri.parse(redirectUriStr);
-    _codeCompleter = Completer<Uri?>();
-
-    _redirectServer = await HttpServer.bind(
-      'localhost',
-      redirectUri.port,
-      shared: true,
-    );
-
-    final expectedPath = redirectUri.path.isEmpty ? '/' : redirectUri.path;
-
-    _redirectServer!.listen((HttpRequest request) async {
-      final uri = request.uri;
-
-      if (uri.path != expectedPath) {
-        await _writeBrowserResponse(
-          request,
-          status: HttpStatus.notFound,
-          title: 'Not Found',
-          message: 'Unknown callback path.',
-          isSuccess: false,
-        );
-        return;
-      }
-
-      if (uri.queryParameters['state'] != _expectedState) {
-        await _writeBrowserResponse(
-          request,
-          status: HttpStatus.badRequest,
-          title: 'Sign-in Failed',
-          message: 'State mismatch — possible CSRF attempt.',
-          isSuccess: false,
-        );
-        if (_codeCompleter != null && !_codeCompleter!.isCompleted) {
-          _codeCompleter!.completeError(
-            const UidsProviderSignInException('Invalid OAuth state.'),
-          );
-        }
-        return;
-      }
-
-      final error = uri.queryParameters['error'];
-      if (error != null) {
-        final desc = uri.queryParameters['error_description'] ?? '';
-        await _writeBrowserResponse(
-          request,
-          status: HttpStatus.badRequest,
-          title: 'Sign-in Failed',
-          message: 'GitHub returned an error: $error — $desc',
-          isSuccess: false,
-        );
-        if (_codeCompleter != null && !_codeCompleter!.isCompleted) {
-          final ex = error == 'access_denied'
-              ? const UidsProviderCancelledException()
-              : UidsProviderSignInException('GitHub OAuth error: $error — $desc');
-          _codeCompleter!.completeError(ex);
-        }
-        return;
-      }
-
-      await _writeBrowserResponse(
-        request,
-        status: HttpStatus.ok,
-        title: 'GitHub Sign-In Complete',
-        message:
-            'Authentication successful! You may close this tab and return to the app.',
-      );
-
-      await _redirectServer?.close();
-      _redirectServer = null;
-
-      if (_codeCompleter != null && !_codeCompleter!.isCompleted) {
-        _codeCompleter!.complete(uri);
-      }
-    });
-  }
-
-  Future<void> _writeBrowserResponse(
-    HttpRequest request, {
-    required int status,
-    required String title,
-    required String message,
-    bool isSuccess = true,
-  }) {
-    request.response
-      ..statusCode = status
-      ..headers.contentType = ContentType.html
-      ..write(
-        buildAuthCallbackHtml(
-          title: title,
-          message: message,
-          isSuccess: isSuccess,
-        ),
-      );
-    return request.response.close();
-  }
-
-  // ── Mobile: deep-link listener ────────────────────────────────────────────
-
-  Future<void> _setupDeepLinkListener() async {
-    _codeCompleter = Completer<Uri?>();
-    _deepLinkSub = _deepLinkController.stream.listen(_handleDeepLinkUri);
-  }
-
-  void _handleDeepLinkUri(Uri uri) {
-    if (_codeCompleter == null || _codeCompleter!.isCompleted) return;
-
-    final error = uri.queryParameters['error'];
-    if (error != null) {
-      final desc = uri.queryParameters['error_description'] ?? '';
-      final ex = error == 'access_denied'
-          ? const UidsProviderCancelledException()
-          : UidsProviderSignInException('GitHub OAuth error: $error — $desc');
-      _codeCompleter!.completeError(ex);
-      return;
-    }
-
-    if (uri.queryParameters['state'] != _expectedState) {
-      _codeCompleter!.completeError(
-        const UidsProviderSignInException(
-          'Invalid OAuth state in deep-link callback.',
-        ),
-      );
-      return;
-    }
-
-    final code = uri.queryParameters['code'];
-    if (code == null || code.isEmpty) {
-      _codeCompleter!.completeError(
-        const UidsProviderSignInException(
-          'No authorization code in deep-link callback.',
-        ),
-      );
-      return;
-    }
-
-    _codeCompleter!.complete(uri);
-  }
-
-  // ── Callback wait ─────────────────────────────────────────────────────────
-
-  Future<Uri?> _waitForCallback() async {
-    final timeout = _isMobile ? _mobileFlowTimeout : _desktopFlowTimeout;
-    return _codeCompleter!.future.timeout(timeout, onTimeout: () => null);
-  }
-
-  // ── Cleanup ───────────────────────────────────────────────────────────────
-
-  Future<void> _cleanup() async {
-    await _redirectServer?.close(force: true);
-    _redirectServer = null;
-    await _deepLinkSub?.cancel();
-    _deepLinkSub = null;
-    _codeCompleter = null;
-    _expectedState = null;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -528,7 +341,6 @@ final class GitHubAuthAdapter implements ProviderAuthAdapter {
     return _base64UrlNoPad(digest.bytes);
   }
 
-  static String _base64UrlNoPad(List<int> bytes) {
-    return base64Url.encode(bytes).replaceAll('=', '');
-  }
+  static String _base64UrlNoPad(List<int> bytes) =>
+      base64Url.encode(bytes).replaceAll('=', '');
 }

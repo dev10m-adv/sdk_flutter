@@ -212,20 +212,27 @@ final class UidsAuthSdkImpl implements UidsAuthSdk {
 
   Map<AuthProvider, ProviderAuthAdapter> _buildAdapters(UidsSdkConfig config) {
     final adapters = <AuthProvider, ProviderAuthAdapter>{};
+    final launcher = config.browserLauncher;
 
     if (config.google != null) {
-      adapters[AuthProvider.google] =
-          GoogleAuthAdapter.fromPlatform(config: config.google!);
+      adapters[AuthProvider.google] = GoogleAuthAdapter.fromPlatform(
+        config: config.google!,
+        browserLauncher: launcher,
+      );
     }
 
     if (config.microsoft != null) {
-      adapters[AuthProvider.microsoft] =
-          MicrosoftAuthAdapter(config: config.microsoft!);
+      adapters[AuthProvider.microsoft] = MicrosoftAuthAdapter(
+        config: config.microsoft!,
+        browserLauncher: launcher,
+      );
     }
 
     if (config.github != null) {
-      adapters[AuthProvider.github] =
-          GitHubAuthAdapter(config: config.github!);
+      adapters[AuthProvider.github] = GitHubAuthAdapter(
+        config: config.github!,
+        browserLauncher: launcher,
+      );
     }
 
     return adapters;

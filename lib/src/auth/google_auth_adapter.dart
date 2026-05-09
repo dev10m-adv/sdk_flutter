@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import '../browser/auth_browser_launcher.dart';
 import '../config/google_auth_config.dart';
 import '../errors/uids_auth_exception.dart';
 import '../models/auth_provider.dart';
@@ -27,13 +28,19 @@ final class GoogleAuthAdapter implements ProviderAuthAdapter {
 
   /// Convenience factory — selects the platform adapter based on the host OS.
   ///
-  /// - Android / iOS              → [GoogleMobileAuthAdapter]
-  /// - Windows / macOS / Linux    → [GoogleDesktopAuthAdapter]
+  /// - Android / iOS              → [GoogleMobileAuthAdapter] (uses `google_sign_in`;
+  ///   [browserLauncher] is ignored on mobile since the native plugin handles UI)
+  /// - Windows / macOS / Linux    → [GoogleDesktopAuthAdapter] (PKCE + [browserLauncher])
   ///
   /// This factory is the **only** place in the SDK that performs Google
   /// platform detection.
-  factory GoogleAuthAdapter.fromPlatform({required GoogleAuthConfig config}) {
-    return GoogleAuthAdapter(platformAdapter: _selectPlatform(config));
+  factory GoogleAuthAdapter.fromPlatform({
+    required GoogleAuthConfig config,
+    AuthBrowserLauncher? browserLauncher,
+  }) {
+    return GoogleAuthAdapter(
+      platformAdapter: _selectPlatform(config, browserLauncher),
+    );
   }
 
   final GoogleAuthPlatformAdapter _platform;
@@ -56,12 +63,18 @@ final class GoogleAuthAdapter implements ProviderAuthAdapter {
 
   // ── Internals ─────────────────────────────────────────────────────────────
 
-  static GoogleAuthPlatformAdapter _selectPlatform(GoogleAuthConfig config) {
+  static GoogleAuthPlatformAdapter _selectPlatform(
+    GoogleAuthConfig config,
+    AuthBrowserLauncher? launcher,
+  ) {
     if (Platform.isAndroid || Platform.isIOS) {
       return GoogleMobileAuthAdapter(config: config);
     }
     if (Platform.isMacOS || Platform.isLinux || Platform.isWindows) {
-      return GoogleDesktopAuthAdapter(config: config);
+      return GoogleDesktopAuthAdapter(
+        config: config,
+        browserLauncher: launcher,
+      );
     }
     throw const UidsProviderSignInException(
       'Google sign-in is not supported on this platform.',

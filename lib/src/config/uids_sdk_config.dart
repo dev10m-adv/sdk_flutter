@@ -1,3 +1,4 @@
+import '../browser/auth_browser_launcher.dart';
 import 'github_auth_config.dart';
 import 'google_auth_config.dart';
 import 'microsoft_auth_config.dart';
@@ -18,6 +19,7 @@ final class UidsSdkConfig {
     this.google,
     this.microsoft,
     this.github,
+    this.browserLauncher,
   });
 
   /// Base URL for the consumer's main API (used for device endpoints, etc.).
@@ -55,4 +57,26 @@ final class UidsSdkConfig {
   /// GitHub OAuth App configuration.  Required if you call
   /// [UidsAuthSdk.signInWithProvider] with [AuthProvider.github].
   final GitHubAuthConfig? github;
+
+  /// Controls how OAuth authorization URLs are opened and how the callback is
+  /// captured.
+  ///
+  /// - `null` (default): uses [ExternalBrowserLauncher], which opens the
+  ///   system browser.  This is the same behavior as previous SDK versions —
+  ///   no migration needed.
+  ///
+  /// - [InAppWebViewLauncher]: shows a modal in-app WebView dialog.  Requires
+  ///   a `contextProvider` that returns a live [BuildContext]:
+  ///
+  /// ```dart
+  /// UidsSdkConfig(
+  ///   browserLauncher: InAppWebViewLauncher(
+  ///     contextProvider: () => navigatorKey.currentContext!,
+  ///   ),
+  ///   ...
+  /// )
+  /// ```
+  ///
+  /// - Any custom [AuthBrowserLauncher] implementation for advanced use cases.
+  final AuthBrowserLauncher? browserLauncher;
 }
