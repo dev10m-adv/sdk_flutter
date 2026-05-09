@@ -6,6 +6,7 @@
 library uids_auth_sdk;
 
 // Config
+export 'src/config/github_auth_config.dart';
 export 'src/config/google_auth_config.dart';
 export 'src/config/microsoft_auth_config.dart';
 export 'src/config/uids_sdk_config.dart';

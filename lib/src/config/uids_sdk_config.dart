@@ -1,3 +1,4 @@
+import 'github_auth_config.dart';
 import 'google_auth_config.dart';
 import 'microsoft_auth_config.dart';
 
@@ -16,6 +17,7 @@ final class UidsSdkConfig {
     this.refreshBeforeExpiry = const Duration(minutes: 5),
     this.google,
     this.microsoft,
+    this.github,
   });
 
   /// Base URL for the consumer's main API (used for device endpoints, etc.).
@@ -49,4 +51,8 @@ final class UidsSdkConfig {
   /// Microsoft authentication configuration.  Required if you call
   /// [UidsAuthSdk.signInWithProvider] with [AuthProvider.microsoft].
   final MicrosoftAuthConfig? microsoft;
+
+  /// GitHub OAuth App configuration.  Required if you call
+  /// [UidsAuthSdk.signInWithProvider] with [AuthProvider.github].
+  final GitHubAuthConfig? github;
 }

@@ -1,4 +1,5 @@
 import '../auth/auth_manager.dart';
+import '../auth/github_auth_adapter.dart';
 import '../auth/google_auth_adapter.dart';
 import '../auth/microsoft_auth_adapter.dart';
 import '../auth/provider_auth_adapter.dart';
@@ -220,6 +221,11 @@ final class UidsAuthSdkImpl implements UidsAuthSdk {
     if (config.microsoft != null) {
       adapters[AuthProvider.microsoft] =
           MicrosoftAuthAdapter(config: config.microsoft!);
+    }
+
+    if (config.github != null) {
+      adapters[AuthProvider.github] =
+          GitHubAuthAdapter(config: config.github!);
     }
 
     return adapters;
