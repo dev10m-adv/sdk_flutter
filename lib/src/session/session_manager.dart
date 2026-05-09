@@ -21,10 +21,10 @@ final class SessionManager {
     required SdkStorage storage,
     required Duration refreshBeforeExpiry,
     required bool autoRefresh,
-  })  : _api = apiClient,
-        _storage = storage,
-        _refreshBeforeExpiry = refreshBeforeExpiry,
-        _autoRefresh = autoRefresh;
+  }) : _api = apiClient,
+       _storage = storage,
+       _refreshBeforeExpiry = refreshBeforeExpiry,
+       _autoRefresh = autoRefresh;
 
   final AuthApiClient _api;
   final SdkStorage _storage;
@@ -33,6 +33,7 @@ final class SessionManager {
 
   AuthSession? _memoryCache;
   Timer? _refreshTimer;
+  Future<AuthSession>? _activeRefresh;
 
   final _sessionController = StreamController<AuthSession?>.broadcast();
 
@@ -61,22 +62,32 @@ final class SessionManager {
   /// Persists [session] in memory and secure storage, schedules auto-refresh.
   Future<void> saveSession(AuthSession session) async {
     _memoryCache = session;
-    print('Saving session for user: ${session.user.email}');
     await _storage.write(StorageKeys.session, jsonEncode(session.toJson()));
     _sessionController.add(session);
     _scheduleAutoRefresh(session);
   }
 
-  /// Forces a token refresh against the backend.
-  ///
-  /// On [UidsRefreshTokenExpiredException] the session is cleared and the
-  /// exception is re-thrown.  Other network errors do NOT clear the session.
   Future<AuthSession> refreshSession() async {
+    if (_activeRefresh != null) return _activeRefresh!;
+
+    _activeRefresh = _doRefresh();
+    try {
+      return await _activeRefresh!;
+    } finally {
+      _activeRefresh = null;
+    }
+  }
+
+  Future<AuthSession> _doRefresh() async {
     final session = await currentSession();
     if (session == null) throw const UidsSessionExpiredException();
 
     try {
-      final refreshed = await _api.refreshToken(session.refreshToken);
+      final refreshed = await _api.refreshToken(
+        session.refreshToken,
+        username: session.user.email,
+        provider: session.provider.name,
+      );
       await saveSession(refreshed);
       return refreshed;
     } on UidsRefreshTokenExpiredException {
@@ -110,33 +121,35 @@ final class SessionManager {
 
   Future<AuthSession?> _loadFromStorage() async {
     final raw = await _storage.read(StorageKeys.session);
-    print('Loaded session from storage: $raw');
+
     if (raw == null) return null;
     try {
-      final session =
-          AuthSession.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-      print('Parsed session from storage: $session');
+      final session = AuthSession.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+
       _memoryCache = session;
+      _scheduleAutoRefresh(session, refreshIfDue: false);
       return session;
     } catch (_) {
-      print('Failed to parse session from storage, clearing corrupted data');
       // Corrupted storage — treat as missing.
       await _storage.delete(StorageKeys.session);
       return null;
     }
   }
 
-  void _scheduleAutoRefresh(AuthSession session) {
+  void _scheduleAutoRefresh(AuthSession session, {bool refreshIfDue = true}) {
     if (!_autoRefresh) return;
     _refreshTimer?.cancel();
 
     final delay = session.accessTokenExpiresAt
+        .toUtc()
         .subtract(_refreshBeforeExpiry)
-        .difference(DateTime.now());
+        .difference(DateTime.now().toUtc());
 
     if (delay.isNegative) {
-      // Already expired or within buffer — refresh immediately.
-      _triggerRefresh();
+      if (!refreshIfDue) return;
+      _refreshTimer = Timer(Duration.zero, _triggerRefresh);
       return;
     }
 

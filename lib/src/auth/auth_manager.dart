@@ -21,9 +21,9 @@ final class AuthManager {
     required AuthApiClient apiClient,
     required SessionManager sessionManager,
     required Map<AuthProvider, ProviderAuthAdapter> adapters,
-  })  : _api = apiClient,
-        _session = sessionManager,
-        _adapters = adapters;
+  }) : _api = apiClient,
+       _session = sessionManager,
+       _adapters = adapters;
 
   final AuthApiClient _api;
   final SessionManager _session;
@@ -36,10 +36,7 @@ final class AuthManager {
   }) async {
     final adapter = _requireAdapter(provider);
     final providerResult = await adapter.signIn(scopes: scopes);
-    print("Access TOKEN : \n${providerResult.accessToken}\n");
     final session = await _api.exchangeProviderToken(providerResult);
-    print("SESSION : \n${session.accessToken}\n");
-    print("Saving session...");
     await _session.saveSession(session);
     return session;
   }
@@ -57,8 +54,9 @@ final class AuthManager {
     List<String> scopes = const ['openid', 'email', 'profile'],
   }) async {
     final adapter = _requireAdapter(provider);
-    final ProviderAuthResult providerResult =
-        await adapter.refresh(scopes: scopes);
+    final ProviderAuthResult providerResult = await adapter.refresh(
+      scopes: scopes,
+    );
     final session = await _api.exchangeProviderToken(providerResult);
     await _session.saveSession(session);
     return session;

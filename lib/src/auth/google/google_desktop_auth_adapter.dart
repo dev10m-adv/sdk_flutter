@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../auth_callback_page.dart';
 import '../../config/google_auth_config.dart';
 import '../../errors/uids_auth_exception.dart';
 import '../../models/auth_provider.dart';
@@ -34,9 +35,9 @@ final class GoogleDesktopAuthAdapter implements GoogleAuthPlatformAdapter {
     required GoogleAuthConfig config,
     http.Client? httpClient,
     Future<void> Function(Uri url)? launchUrl,
-  })  : _config = config,
-        _http = httpClient ?? http.Client(),
-        _launchUrl = launchUrl ?? _defaultLaunchUrl;
+  }) : _config = config,
+       _http = httpClient ?? http.Client(),
+       _launchUrl = launchUrl ?? _defaultLaunchUrl;
 
   static const _authorizeEndpoint =
       'https://accounts.google.com/o/oauth2/v2/auth';
@@ -58,9 +59,7 @@ final class GoogleDesktopAuthAdapter implements GoogleAuthPlatformAdapter {
   // ── GoogleAuthPlatformAdapter ────────────────────────────────────────────
 
   @override
-  Future<ProviderAuthResult> signIn({
-    List<String> scopes = const [],
-  }) async {
+  Future<ProviderAuthResult> signIn({List<String> scopes = const []}) async {
     final clientId = _requireClientId();
     final redirectUri = _resolveRedirectUri();
     final effectiveScopes = _withOpenIdScopes(scopes);
@@ -72,8 +71,10 @@ final class GoogleDesktopAuthAdapter implements GoogleAuthPlatformAdapter {
     HttpServer? server;
     try {
       server = await HttpServer.bind(
-          InternetAddress.loopbackIPv4, redirectUri.port,
-          shared: true);
+        InternetAddress.loopbackIPv4,
+        redirectUri.port,
+        shared: true,
+      );
       final authorizeUrl = Uri.parse(_authorizeEndpoint).replace(
         queryParameters: <String, String>{
           'response_type': 'code',
@@ -131,9 +132,7 @@ final class GoogleDesktopAuthAdapter implements GoogleAuthPlatformAdapter {
   }
 
   @override
-  Future<ProviderAuthResult> refresh({
-    List<String> scopes = const [],
-  }) async {
+  Future<ProviderAuthResult> refresh({List<String> scopes = const []}) async {
     final refreshToken = _refreshToken;
     if (refreshToken == null) {
       throw const UidsProviderSignInException(
@@ -258,9 +257,7 @@ final class GoogleDesktopAuthAdapter implements GoogleAuthPlatformAdapter {
         if (error == 'access_denied') {
           throw const UidsProviderCancelledException();
         }
-        throw UidsProviderSignInException(
-          'Google sign-in error: $error.',
-        );
+        throw UidsProviderSignInException('Google sign-in error: $error.');
       }
 
       final code = params['code'];
@@ -294,12 +291,16 @@ final class GoogleDesktopAuthAdapter implements GoogleAuthPlatformAdapter {
     required int status,
     required String body,
   }) {
+    final isSuccess = status >= 200 && status < 300;
     request.response
       ..statusCode = status
       ..headers.contentType = ContentType.html
       ..write(
-        '<!doctype html><html><body style="font-family: system-ui; '
-        'padding: 2rem;"><p>$body</p></body></html>',
+        buildAuthCallbackHtml(
+          title: isSuccess ? 'Sign-in Complete' : 'Sign-in Failed',
+          message: body,
+          isSuccess: isSuccess,
+        ),
       );
     // Closing the response is fire-and-forget — the server is closed in the
     // outer `finally`.
@@ -423,8 +424,11 @@ final class GoogleDesktopAuthAdapter implements GoogleAuthPlatformAdapter {
 
   String _randomUrlSafe(int byteLength) {
     final rng = Random.secure();
-    final bytes = List<int>.generate(byteLength, (_) => rng.nextInt(256),
-        growable: false);
+    final bytes = List<int>.generate(
+      byteLength,
+      (_) => rng.nextInt(256),
+      growable: false,
+    );
     return _base64UrlNoPad(bytes);
   }
 
@@ -457,10 +461,7 @@ final class GoogleDesktopAuthAdapter implements GoogleAuthPlatformAdapter {
   //   );
   // }
   static Future<void> _defaultLaunchUrl(Uri url) async {
-    final launched = await launchUrl(
-      url,
-      mode: LaunchMode.externalApplication,
-    );
+    final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
     if (launched) {
       return;
     }

@@ -3,10 +3,7 @@
 /// Paths are intentionally kept separate from the HTTP client so they can be
 /// unit-tested without network access.
 final class AuthEndpoints {
-  const AuthEndpoints({
-    required this.authBaseUrl,
-    required this.apiBaseUrl,
-  });
+  const AuthEndpoints({required this.authBaseUrl, required this.apiBaseUrl});
 
   final Uri authBaseUrl;
   final Uri apiBaseUrl;
@@ -19,8 +16,10 @@ final class AuthEndpoints {
   Uri get exchangeToken => authBaseUrl.replace(path: '${apiBaseUrl.path}/auth');
 
   /// Use a refresh token to obtain a new access token.
+  // Uri get refreshToken =>
+  // authBaseUrl.replace(path: '${authBaseUrl.path}/v1/auth/refresh');
   Uri get refreshToken =>
-      authBaseUrl.replace(path: '${authBaseUrl.path}/v1/auth/refresh');
+      authBaseUrl.replace(path: '${authBaseUrl.path}/refresh');
 
   // ── Device endpoints ──────────────────────────────────────────────────────
 

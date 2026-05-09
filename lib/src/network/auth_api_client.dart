@@ -15,15 +15,13 @@ import 'auth_endpoints.dart';
 /// [UidsAuthException] subclasses so callers never deal with raw Dio/http
 /// exceptions.
 final class AuthApiClient {
-  AuthApiClient({
-    required UidsSdkConfig config,
-    http.Client? httpClient,
-  })  : _config = config,
-        _http = httpClient ?? http.Client(),
-        _endpoints = AuthEndpoints(
-          authBaseUrl: config.authBaseUrl,
-          apiBaseUrl: config.apiBaseUrl,
-        );
+  AuthApiClient({required UidsSdkConfig config, http.Client? httpClient})
+    : _config = config,
+      _http = httpClient ?? http.Client(),
+      _endpoints = AuthEndpoints(
+        authBaseUrl: config.authBaseUrl,
+        apiBaseUrl: config.apiBaseUrl,
+      );
 
   final UidsSdkConfig _config;
   final http.Client _http;
@@ -55,15 +53,26 @@ final class AuthApiClient {
   }
 
   /// Use [refreshToken] to obtain a refreshed [AuthSession].
-  Future<AuthSession> refreshToken(String refreshToken) async {
+  ///
+  /// [username] and [provider] are sent as compatibility hints and also used
+  /// as local fallbacks in case older backend responses omit them.
+  Future<AuthSession> refreshToken(
+    String refreshToken, {
+    required String username,
+    required String provider,
+  }) async {
     final body = <String, dynamic>{
-      'refresh_token': refreshToken,
-      'client_id': _config.clientId,
-      if (_config.clientSecret != null) 'client_secret': _config.clientSecret,
+      // Backend contract: refreshToken (camelCase).
+      'refreshToken': refreshToken,
+      // Optional compatibility context for backend/client fallback handling.
+      'username': username,
+      'idpName': provider,
     };
 
     try {
       final json = await _post(_endpoints.refreshToken, body, authToken: null);
+      json['username'] ??= username;
+      json['idpName'] ??= provider;
       return AuthSession.fromJson(json);
     } on UidsNetworkException catch (e) {
       if (e.statusCode == 401 || e.statusCode == 400) {
@@ -104,8 +113,10 @@ final class AuthApiClient {
 
   /// Unregister (delete) a device.
   Future<void> unregisterDevice(String deviceId, String accessToken) async {
-    await _delete(_endpoints.unregisterDevice(deviceId),
-        authToken: accessToken);
+    await _delete(
+      _endpoints.unregisterDevice(deviceId),
+      authToken: accessToken,
+    );
   }
 
   /// Fetch and validate a registered device by ID.
@@ -123,10 +134,10 @@ final class AuthApiClient {
   // ── Internals ─────────────────────────────────────────────────────────────
 
   Map<String, String> _headers({String? authToken}) => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        if (authToken != null) 'Authorization': 'Bearer $authToken',
-      };
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    if (authToken != null) 'Authorization': 'Bearer $authToken',
+  };
 
   Future<Map<String, dynamic>> _post(
     Uri uri,

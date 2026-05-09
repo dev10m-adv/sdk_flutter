@@ -16,54 +16,43 @@ import 'google_auth_platform_adapter.dart';
 /// - `accessToken` comes from `account.authorizationClient`.
 final class GoogleMobileAuthAdapter implements GoogleAuthPlatformAdapter {
   GoogleMobileAuthAdapter({required GoogleAuthConfig config})
-      : _config = config;
+    : _config = config;
 
   final GoogleAuthConfig _config;
 
   bool _initialized = false;
 
   @override
-  Future<ProviderAuthResult> signIn({
-    List<String> scopes = const [],
-  }) async {
+  Future<ProviderAuthResult> signIn({List<String> scopes = const []}) async {
     try {
       await _ensureInitialized();
 
       final account = await GoogleSignIn.instance.authenticate();
 
-      return _toResult(
-        account,
-        scopes,
-        failureMessage: 'Google sign-in',
-      );
+      return _toResult(account, scopes, failureMessage: 'Google sign-in');
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw const UidsProviderCancelledException();
       }
 
       throw UidsProviderSignInException(
-        'Google sign-in failed.',
+        _formatGoogleSignInException(e),
         cause: e,
       );
     } on UidsAuthException {
       rethrow;
     } catch (e) {
-      throw UidsProviderSignInException(
-        'Google sign-in failed.',
-        cause: e,
-      );
+      throw UidsProviderSignInException('Google sign-in failed.', cause: e);
     }
   }
 
   @override
-  Future<ProviderAuthResult> refresh({
-    List<String> scopes = const [],
-  }) async {
+  Future<ProviderAuthResult> refresh({List<String> scopes = const []}) async {
     try {
       await _ensureInitialized();
 
-      final account =
-          await GoogleSignIn.instance.attemptLightweightAuthentication();
+      final account = await GoogleSignIn.instance
+          .attemptLightweightAuthentication();
 
       if (account == null) {
         throw const UidsProviderSignInException(
@@ -144,11 +133,33 @@ final class GoogleMobileAuthAdapter implements GoogleAuthPlatformAdapter {
   ) async {
     if (scopes.isEmpty) return null;
 
-    var authorization =
-        await account.authorizationClient.authorizationForScopes(scopes);
+    var authorization = await account.authorizationClient
+        .authorizationForScopes(scopes);
 
     authorization ??= await account.authorizationClient.authorizeScopes(scopes);
 
     return authorization.accessToken;
+  }
+
+  String _formatGoogleSignInException(GoogleSignInException e) {
+    final description = (e.description ?? '').trim();
+    final code = e.code.toString().split('.').last;
+
+    if (e.code == GoogleSignInExceptionCode.clientConfigurationError) {
+      if (Platform.isAndroid &&
+          description.contains('serverClientId must be provided on Android')) {
+        return 'Google sign-in configuration error on Android. '
+            'serverClientId is required. '
+            'Set GoogleAuthConfig.webClientId to your Google Web OAuth client ID.';
+      }
+
+      return description.isEmpty
+          ? 'Google sign-in configuration error.'
+          : 'Google sign-in configuration error: $description';
+    }
+
+    return description.isEmpty
+        ? 'Google sign-in failed ($code).'
+        : 'Google sign-in failed ($code): $description';
   }
 }
