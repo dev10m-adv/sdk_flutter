@@ -1,5 +1,7 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import '../browser/auth_browser_launcher.dart';
 import '../config/google_auth_config.dart';
 import '../errors/uids_auth_exception.dart';
@@ -8,6 +10,7 @@ import '../models/provider_auth_result.dart';
 import 'google/google_auth_platform_adapter.dart';
 import 'google/google_desktop_auth_adapter.dart';
 import 'google/google_mobile_auth_adapter.dart';
+import 'google/google_web_auth_adapter.dart';
 import 'provider_auth_adapter.dart';
 
 /// `ProviderAuthAdapter` for Google.
@@ -24,13 +27,15 @@ import 'provider_auth_adapter.dart';
 final class GoogleAuthAdapter implements ProviderAuthAdapter {
   /// Inject a specific platform adapter.  Prefer this in tests.
   const GoogleAuthAdapter({required GoogleAuthPlatformAdapter platformAdapter})
-      : _platform = platformAdapter;
+    : _platform = platformAdapter;
 
   /// Convenience factory — selects the platform adapter based on the host OS.
   ///
-  /// - Android / iOS              → [GoogleMobileAuthAdapter] (uses `google_sign_in`;
-  ///   [browserLauncher] is ignored on mobile since the native plugin handles UI)
-  /// - Windows / macOS / Linux    → [GoogleDesktopAuthAdapter] (PKCE + [browserLauncher])
+  /// | Platform              | Adapter                  | Notes |
+  /// |-----------------------|--------------------------|-------|
+  /// | Web                   | [GoogleWebAuthAdapter]   | OAuth popup via `google_sign_in_web`; [browserLauncher] ignored |
+  /// | Android / iOS         | [GoogleMobileAuthAdapter]| Native plugin; [browserLauncher] ignored |
+  /// | Windows / macOS / Linux | [GoogleDesktopAuthAdapter] | PKCE via [browserLauncher] |
   ///
   /// This factory is the **only** place in the SDK that performs Google
   /// platform detection.
@@ -67,6 +72,11 @@ final class GoogleAuthAdapter implements ProviderAuthAdapter {
     GoogleAuthConfig config,
     AuthBrowserLauncher? launcher,
   ) {
+    // kIsWeb must be checked before any Platform.* call — the dart:io Platform
+    // stub on web throws UnsupportedError at runtime.
+    if (kIsWeb) {
+      return GoogleWebAuthAdapter(config: config);
+    }
     if (Platform.isAndroid || Platform.isIOS) {
       return GoogleMobileAuthAdapter(config: config);
     }

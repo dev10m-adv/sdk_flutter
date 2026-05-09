@@ -1,5 +1,4 @@
 import '../auth/auth_manager.dart';
-import '../auth/github_auth_adapter.dart';
 import '../auth/google_auth_adapter.dart';
 import '../auth/microsoft_auth_adapter.dart';
 import '../auth/provider_auth_adapter.dart';
@@ -132,9 +131,7 @@ final class UidsAuthSdkImpl implements UidsAuthSdk {
   // ── Device ────────────────────────────────────────────────────────────────
 
   @override
-  Future<RegisteredDevice> registerDevice(
-    DeviceRegisterRequest request,
-  ) async {
+  Future<RegisteredDevice> registerDevice(DeviceRegisterRequest request) async {
     _assertInitialized();
     return _device.registerDevice(request);
   }
@@ -212,26 +209,16 @@ final class UidsAuthSdkImpl implements UidsAuthSdk {
 
   Map<AuthProvider, ProviderAuthAdapter> _buildAdapters(UidsSdkConfig config) {
     final adapters = <AuthProvider, ProviderAuthAdapter>{};
-    final launcher = config.browserLauncher;
 
     if (config.google != null) {
       adapters[AuthProvider.google] = GoogleAuthAdapter.fromPlatform(
         config: config.google!,
-        browserLauncher: launcher,
       );
     }
 
     if (config.microsoft != null) {
       adapters[AuthProvider.microsoft] = MicrosoftAuthAdapter(
         config: config.microsoft!,
-        browserLauncher: launcher,
-      );
-    }
-
-    if (config.github != null) {
-      adapters[AuthProvider.github] = GitHubAuthAdapter(
-        config: config.github!,
-        browserLauncher: launcher,
       );
     }
 

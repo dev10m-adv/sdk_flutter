@@ -174,20 +174,45 @@ UidsSdkConfig(browserLauncher: MyCustomLauncher(), ...)
 
 ### Google
 
-| Platform | Flow |
-|---|---|
-| Android / iOS | Native `google_sign_in` plugin (no browser) |
-| Desktop | OAuth 2.0 PKCE via `AuthBrowserLauncher` |
+| Platform | Adapter | Notes |
+|---|---|---|
+| Web | `GoogleWebAuthAdapter` | OAuth popup via `google_sign_in_web` |
+| Android / iOS | `GoogleMobileAuthAdapter` | Native `google_sign_in` plugin |
+| Desktop | `GoogleDesktopAuthAdapter` | OAuth 2.0 PKCE via `AuthBrowserLauncher` |
 
 ```dart
 GoogleAuthConfig(
-  webClientId:         'YOUR_WEB_CLIENT_ID',
+  webClientId:         'YOUR_WEB_CLIENT_ID',       // required for web & as mobile fallback
   androidClientId:     'YOUR_ANDROID_CLIENT_ID',   // optional
   iosClientId:         'YOUR_IOS_CLIENT_ID',        // optional
   desktopClientId:     'YOUR_DESKTOP_CLIENT_ID',
   desktopClientSecret: 'YOUR_DESKTOP_SECRET',
   desktopRedirectUri:  'http://localhost:8585/callback',
 )
+```
+
+#### Web setup
+
+1. Add both packages to your app's `pubspec.yaml`:
+
+```yaml
+dependencies:
+  google_sign_in: ^7.2.0
+  google_sign_in_web: ^1.1.3
+```
+
+2. Add the Google Identity Services script to `web/index.html` **before** `main.dart.js`:
+
+```html
+<head>
+  ...
+  <script src="https://accounts.google.com/gsi/client"></script>
+</head>
+```
+
+3. Create a **Web application** OAuth 2.0 client in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and add your app's origin to the allowed JavaScript origins (e.g. `http://localhost:PORT` for local dev).  Pass that client ID as `webClientId`.
+
+> **Note:** On web the `AuthBrowserLauncher` setting has no effect for Google — the plugin handles the OAuth popup internally.
 ```
 
 ### Microsoft
