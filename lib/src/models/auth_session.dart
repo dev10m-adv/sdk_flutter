@@ -1,3 +1,4 @@
+import '../utils/jwt_token_utils.dart';
 import 'auth_provider.dart';
 import 'auth_user.dart';
 
@@ -6,8 +7,6 @@ final class AuthSession {
   const AuthSession({
     required this.accessToken,
     required this.refreshToken,
-    required this.accessTokenExpiresAt,
-    required this.refreshTokenExpiresAt,
     required this.user,
     required this.provider,
     this.tokenType = 'Bearer',
@@ -16,9 +15,11 @@ final class AuthSession {
   final String accessToken;
   final String refreshToken;
 
-  /// Always store expiry in UTC to avoid client/server timezone issues.
-  final DateTime accessTokenExpiresAt;
-  final DateTime refreshTokenExpiresAt;
+  /// Access-token expiry derived directly from JWT `exp`.
+  DateTime get accessTokenExpiresAt => readJwtExpiry(accessToken);
+
+  /// Refresh-token expiry derived directly from JWT `exp`.
+  DateTime get refreshTokenExpiresAt => readJwtExpiry(refreshToken);
 
   final AuthUser user;
   final AuthProvider provider;
@@ -41,8 +42,6 @@ final class AuthSession {
     return AuthSession(
       accessToken: json['accessToken'] as String,
       refreshToken: json['refreshToken'] as String,
-      accessTokenExpiresAt: _readDateTime(json['accessTokenExpiresAt']),
-      refreshTokenExpiresAt: _readDateTime(json['refreshTokenExpiresAt']),
       user: AuthUser.temp(json['username'] as String),
 
       /// Supports both backend `idpName` and local `provider`.
@@ -70,17 +69,9 @@ final class AuthSession {
   }
 
   /// Serialises the session for secure-storage caching.
-  ///
-  /// Expiry values are stored as **Unix epoch seconds** (int) so that the
-  /// cached value matches what the backend JWT carries and avoids any ISO-8601
-  /// microsecond formatting artefacts when the value is read back.
   Map<String, dynamic> toJson() => {
     'accessToken': accessToken,
     'refreshToken': refreshToken,
-    'accessTokenExpiresAt':
-        accessTokenExpiresAt.toUtc().millisecondsSinceEpoch ~/ 1000,
-    'refreshTokenExpiresAt':
-        refreshTokenExpiresAt.toUtc().millisecondsSinceEpoch ~/ 1000,
     'username': user.email,
     'provider': provider.name,
     'tokenType': tokenType,
@@ -141,8 +132,6 @@ final class AuthSession {
   AuthSession copyWith({
     String? accessToken,
     String? refreshToken,
-    DateTime? accessTokenExpiresAt,
-    DateTime? refreshTokenExpiresAt,
     AuthUser? user,
     AuthProvider? provider,
     String? tokenType,
@@ -150,28 +139,10 @@ final class AuthSession {
     return AuthSession(
       accessToken: accessToken ?? this.accessToken,
       refreshToken: refreshToken ?? this.refreshToken,
-      accessTokenExpiresAt: accessTokenExpiresAt ?? this.accessTokenExpiresAt,
-      refreshTokenExpiresAt:
-          refreshTokenExpiresAt ?? this.refreshTokenExpiresAt,
       user: user ?? this.user,
       provider: provider ?? this.provider,
       tokenType: tokenType ?? this.tokenType,
     );
-  }
-
-  static DateTime _readDateTime(Object? value) {
-    if (value is String) {
-      return DateTime.parse(value).toUtc();
-    }
-
-    if (value is int) {
-      // JWT `exp` / `iat` claims are Unix timestamps in **seconds**.
-      // Dart's DateTime.fromMillisecondsSinceEpoch expects milliseconds,
-      // so multiply by 1000.
-      return DateTime.fromMillisecondsSinceEpoch(value * 1000, isUtc: true);
-    }
-
-    throw FormatException('Invalid DateTime value: $value');
   }
 
   @override

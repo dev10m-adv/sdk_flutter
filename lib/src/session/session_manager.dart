@@ -53,7 +53,15 @@ final class SessionManager {
     final session = await currentSession();
     if (session == null) throw const UidsSessionExpiredException();
 
-    if (session.isExpiredWithBuffer(_refreshBeforeExpiry)) {
+    bool shouldRefresh;
+    try {
+      shouldRefresh = session.isExpiredWithBuffer(_refreshBeforeExpiry);
+    } on FormatException {
+      // If token claims cannot be decoded locally, force a backend refresh.
+      shouldRefresh = true;
+    }
+
+    if (shouldRefresh) {
       return refreshSession();
     }
     return session;
@@ -142,8 +150,16 @@ final class SessionManager {
     if (!_autoRefresh) return;
     _refreshTimer?.cancel();
 
-    final delay = session.accessTokenExpiresAt
-        .toUtc()
+    DateTime accessExpiry;
+    try {
+      accessExpiry = session.accessTokenExpiresAt.toUtc();
+    } on FormatException {
+      if (!refreshIfDue) return;
+      _refreshTimer = Timer(Duration.zero, _triggerRefresh);
+      return;
+    }
+
+    final delay = accessExpiry
         .subtract(_refreshBeforeExpiry)
         .difference(DateTime.now().toUtc());
 
