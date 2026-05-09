@@ -1,22 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:uids_io_sdk_flutter/auth_view.dart';
+import 'package:uids_io_sdk_flutter/uids_io_sdk_flutter.dart';
 
-void main() async {
-  runApp(MyApp());
+void main() {
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: SignInPage(),
-    );
-  }
-}
+  const MyApp({super.key});
 
-class SignInPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return AuthScreen(key: globalKey);///// this is how you call login screen
+    final config = UidsSdkConfig(
+      apiBaseUrl: Uri.parse('https://api.example.com'),
+      authBaseUrl: Uri.parse('https://auth.example.com'),
+      clientId: 'backend-client-id',
+      google: const GoogleAuthConfig(webClientId: 'google-web-client-id'),
+    );
+
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: const Text('UIDS Auth SDK Example')),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Create an SDK instance with UidsAuthSdk.create() and initialize '
+            'it with ${config.clientId}.',
+          ),
+        ),
+      ),
+    );
   }
 }

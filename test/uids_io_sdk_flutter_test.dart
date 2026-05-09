@@ -1,85 +1,52 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:uids_io_sdk_flutter/configuration.dart';
-import 'package:uids_io_sdk_flutter/models/sdk_outputs.dart';
+import 'package:uids_io_sdk_flutter/uids_io_sdk_flutter.dart';
 
 void main() {
-  test('configuration defaults are set', () {
-    expect(Configuration.AuthUrl, isNotEmpty);
+  test('uids sdk config stores required values', () {
+    final config = UidsSdkConfig(
+      apiBaseUrl: Uri.parse('https://api.example.com'),
+      authBaseUrl: Uri.parse('https://auth.example.com'),
+      clientId: 'client-id',
+      audience: 'audience',
+      google: const GoogleAuthConfig(webClientId: 'web-id'),
+    );
+
+    expect(config.apiBaseUrl, Uri.parse('https://api.example.com'));
+    expect(config.authBaseUrl, Uri.parse('https://auth.example.com'));
+    expect(config.clientId, 'client-id');
+    expect(config.audience, 'audience');
+    expect(config.google?.webClientId, 'web-id');
   });
 
-  test('AuthEntitiesResponse parses camelCase AdvComm JSON', () {
-    final r = AuthEntitiesResponse.fromJson({
-      'errorDetails': '',
+  test('auth session parses backend auth payload', () {
+    final session = AuthSession.fromJson({
+      'accessToken': 'jwt',
+      'refreshToken': 'refresh',
+      'accessTokenExpiresAt': '2030-01-01T00:00:00.000Z',
+      'refreshTokenExpiresAt': '2030-02-01T00:00:00.000Z',
       'username': 'a@b.com',
       'idpName': 'Gmail',
-      'entities': [
-        {
-          'tenant': 't@en.ant',
-          'authorizations': {
-            'roles': ['all'],
-          },
-          'refreshToken': 'abc123',
-        },
-      ],
     });
-    expect(r.isSuccess, isTrue);
-    expect(r.idpName, 'Gmail');
-    expect(r.entities, hasLength(1));
-    expect(r.entities.single.refreshToken, 'abc123');
-    expect(r.entities.single.roles, ['all']);
+
+    expect(session.accessToken, 'jwt');
+    expect(session.refreshToken, 'refresh');
+    expect(session.user.email, 'a@b.com');
+    expect(session.provider, AuthProvider.google);
+    expect(session.authorizationHeader, 'Bearer jwt');
   });
 
-  test('AuthEntitiesResponse parses entities row with snake_case refresh_token', () {
-    final r = AuthEntitiesResponse.fromJson({
-      'errorDetails': '',
-      'username': 'a@b.com',
-      'idpName': 'Gmail',
-      'entities': [
-        {
-          'tenant': 't@en.ant',
-          'authorizations': {
-            'roles': ['all'],
-          },
-          'refresh_token': 'tok-from-db-row',
-        },
-      ],
+  test('registered device parses backend payload', () {
+    final device = RegisteredDevice.fromJson({
+      'id': 'device-1',
+      'stable_device_key': 'stable-key',
+      'platform': 'windows',
+      'device_name': 'Workstation',
+      'registered_at': '2030-01-01T00:00:00.000Z',
     });
-    expect(r.entities.single.refreshToken, 'tok-from-db-row');
-  });
 
-  test('AudTokenResponse parses camelCase /aud body', () {
-    final t = AudTokenResponse.fromJson({
-      'token': 'jwt',
-      'refreshToken': 'rt',
-      'isSuccess': true,
-    });
-    expect(t.accessToken, 'jwt');
-    expect(t.refreshToken, 'rt');
-    expect(t.isSuccess, isTrue);
-  });
-
-  test('RefreshTokenResponse parses camelCase /refresh body', () {
-    final t = RefreshTokenResponse.fromJson({
-      'token': 'newJwt',
-      'refreshToken': 'newRt',
-    });
-    expect(t.accessToken, 'newJwt');
-    expect(t.refreshToken, 'newRt');
-  });
-
-  test('DeviceRegistrationResponse parses camelCase', () {
-    final d = DeviceRegistrationResponse.fromJson({
-      'isSuccess': true,
-      'deviceId': 42,
-      'audDomain': 'https://aud.example',
-      'configurations': [
-        {'idpName': 'Gmail'},
-      ],
-    });
-    expect(d.isSuccess, isTrue);
-    expect(d.deviceId, 42);
-    expect(d.audDomain, 'https://aud.example');
-    expect(d.configurations, hasLength(1));
-    expect(d.configurations.single['idpName'], 'Gmail');
+    expect(device.id, 'device-1');
+    expect(device.stableDeviceKey, 'stable-key');
+    expect(device.platform, 'windows');
+    expect(device.deviceName, 'Workstation');
   });
 }

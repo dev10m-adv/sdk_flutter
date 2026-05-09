@@ -1,119 +1,346 @@
-# uids_io_sdk_flutter
+# UIDS Auth SDK — `uids_io_sdk_flutter`
 
-Flutter package for integrating **single sign-on (SSO)** with your auth backend: email/password, OTP, device registration, Google (Gmail) sign-in, token refresh, and optional UI widgets. 
-
-Targets **Web**, **Android**, **iOS**, and **desktop** (Linux, macOS, Windows).
+A Flutter authentication SDK supporting Google, Microsoft, and GitHub sign-in with backend token exchange, session management, and device registration.
 
 ## Features
 
-- **Configuration** – Point the SDK at your auth service via `Configuration.AuthUrl` and `AudDomain`.
-- **Device registration** – `RegisterService` registers the device and stores returned configuration (including IdP settings).
-- **Email auth** – Login, registration, and OTP verification (`auth.dart`) against your API.
-- **Google sign-in** – `GmailSSO` for Google OAuth; uses platform-appropriate flows (including GIS on web).
-- **Tokens** – JWT and refresh handling with `RefreshTokenService` and secure storage.
-- **Optional UI** – `AuthScreen`, `AuthButtons`, and `AuthLogout` for a quick integration with `go_router`.
-- **Stable response models** – `sdk_outputs.dart`: `AuthEntitiesResponse`, `TenantBinding`, `AudTokenResponse`, `RefreshTokenResponse`, `DeviceRegistrationResponse` — **camelCase JSON only**, matching AdvComm AuthAPI `res.json`. Legacy adapters (`AuthResponseModel`, `Entity`, `AuthTokenModel`) delegate to those DTOs.
-
-## Requirements
-
-| Requirement | Version |
-|-------------|---------|
-| Dart        | `^3.9.0` |
-| Flutter     | `>=3.35.0` |
+- Provider sign-in: Google, Microsoft, GitHub
+- Backend token exchange and session management
+- Silent provider refresh and session refresh
+- Device registration as an independent flow
+- Secure storage-backed session persistence
+- Configurable authentication browser: **system browser** or **in-app WebView**
+- Zero bundled navigation or UI outside the optional WebView dialog
 
 ## Installation
-
-Add the dependency to your app’s `pubspec.yaml`:
 
 ```yaml
 dependencies:
   uids_io_sdk_flutter: ^0.2.0
 ```
 
-Then run:
-
-```bash
-flutter pub get
+```dart
+import 'package:uids_io_sdk_flutter/uids_io_sdk_flutter.dart';
 ```
 
-## Quick start
-
-### 1. Configure endpoints
-
-Before calling any API, set your auth base URL (and optional AUD domain):
+## Quick Start
 
 ```dart
-import 'package:uids_io_sdk_flutter/configuration.dart';
+final sdk = UidsAuthSdk.create();
 
-void setupAuth() {
-  Configuration.AuthUrl = 'https://your-auth.example.com';
-  Configuration.AudDomain = 'https://your-auth.example.com';
+await sdk.initialize(
+  UidsSdkConfig(
+    apiBaseUrl:  Uri.parse('https://api.example.com'),
+    authBaseUrl: Uri.parse('https://auth.example.com'),
+    clientId: 'backend-client-id',
+    google: GoogleAuthConfig(
+      webClientId:          'google-web-client-id',
+      androidClientId:      'google-android-client-id',
+      iosClientId:          'google-ios-client-id',
+      desktopClientId:      'google-desktop-client-id',
+      desktopClientSecret:  'google-desktop-secret',
+      desktopRedirectUri:   'http://localhost:8585/callback',
+    ),
+    microsoft: MicrosoftAuthConfig(
+      clientId:    'azure-app-client-id',
+      tenantId:    'common',
+      redirectUri: 'http://localhost:9000/auth',   // desktop
+      // redirectUri: 'msauth://com.example.app/callback', // mobile
+    ),
+    github: GitHubAuthConfig(
+      clientId:     'github-oauth-app-client-id',
+      clientSecret: 'github-oauth-app-secret',
+      redirectUri:  'http://localhost:9100/auth',  // desktop
+      // redirectUri: 'com.example.app://auth/github', // mobile
+    ),
+  ),
+);
+
+final session = await sdk.signInWithProvider(provider: AuthProvider.google);
+print(session.user.email);
+```
+
+---
+
+## Authentication Browser
+
+By default the SDK opens the system browser for all OAuth flows. You can switch to an in-app WebView dialog by setting `UidsSdkConfig.browserLauncher`.
+
+### Option 1 — External browser (default)
+
+No configuration required. The existing behavior is unchanged.
+
+```dart
+UidsSdkConfig(
+  // no browserLauncher → ExternalBrowserLauncher() is used automatically
+  ...
+)
+```
+
+**Desktop** (Windows / macOS / Linux): a transient loopback HTTP server on the port in your `redirectUri` captures the OAuth callback.
+
+**Mobile** (Android / iOS): your app must forward deep-link URIs to the SDK. Set up a link-handler package (e.g. `app_links`) and forward every incoming URI:
+
+```dart
+// main.dart or wherever you initialise link handling
+_appLinks.uriLinkStream.listen(ExternalBrowserLauncher.handleDeepLinkCallback);
+
+// Legacy per-adapter delegates also work unchanged:
+// MicrosoftAuthAdapter.handleDeepLinkCallback(uri)
+// GitHubAuthAdapter.handleDeepLinkCallback(uri)
+```
+
+Register each provider's redirect URI scheme in `AndroidManifest.xml` / `Info.plist` as required by the provider.
+
+---
+
+### Option 2 — In-app WebView (`InAppWebViewLauncher`)
+
+Shows a modal dialog with an embedded WebView instead of opening the system browser. The WebView intercepts the redirect URI before the OS ever sees it, so **no deep-link URI scheme registration is needed** on Android or iOS.
+
+#### 1. Add the dependency
+
+```yaml
+dependencies:
+  flutter_inappwebview: ^6.1.5
+```
+
+Follow the [flutter_inappwebview setup guide](https://inappwebview.dev/docs/intro) for platform-specific requirements (internet permission on Android, `NSAppTransportSecurity` on iOS, etc.).
+
+#### 2. Create a navigator key
+
+```dart
+final navigatorKey = GlobalKey<NavigatorState>();
+
+MaterialApp(
+  navigatorKey: navigatorKey,
+  ...
+)
+```
+
+#### 3. Pass `InAppWebViewLauncher` to the SDK
+
+```dart
+await sdk.initialize(
+  UidsSdkConfig(
+    browserLauncher: InAppWebViewLauncher(
+      contextProvider: () => navigatorKey.currentContext!,
+    ),
+    ...
+  ),
+);
+```
+
+The `contextProvider` callback is invoked each time a sign-in is triggered, so it always returns a live `BuildContext`.
+
+#### Optional: customise the dialog size
+
+```dart
+InAppWebViewLauncher(
+  contextProvider: () => navigatorKey.currentContext!,
+  dialogWidth:  700,   // logical pixels, default 600
+  dialogHeight: 600,   // logical pixels, default 520
+)
+```
+
+---
+
+### Custom launcher
+
+Implement `AuthBrowserLauncher` for any other browser surface:
+
+```dart
+final class MyCustomLauncher implements AuthBrowserLauncher {
+  @override
+  Future<Uri> launch({
+    required Uri authUrl,
+    required Uri redirectUri,
+    required Duration timeout,
+  }) async {
+    // open authUrl, wait for redirect to redirectUri, return callback Uri
+  }
 }
 ```
 
-### 2. Register the device
-
-Call device registration early (for example after your app starts) so `DeviceId` and IdP **Configurations** are stored for SSO:
+Pass it the same way:
 
 ```dart
-import 'package:uids_io_sdk_flutter/services/register_service.dart';
-
-// e.g. in main() after WidgetsFlutterBinding.ensureInitialized()
-await RegisterService.registerDeviceData();
+UidsSdkConfig(browserLauncher: MyCustomLauncher(), ...)
 ```
 
-### 3. Use the bundled auth UI (optional)
+---
 
-The package exports `AuthScreen` and related widgets. Wire your app with a router (the SDK uses `go_router` for navigation after login):
+## Providers
+
+### Google
+
+| Platform | Adapter | Notes |
+|---|---|---|
+| Web | `GoogleWebAuthAdapter` | OAuth popup via `google_sign_in_web` |
+| Android / iOS | `GoogleMobileAuthAdapter` | Native `google_sign_in` plugin |
+| Desktop | `GoogleDesktopAuthAdapter` | OAuth 2.0 PKCE via `AuthBrowserLauncher` |
 
 ```dart
-import 'package:uids_io_sdk_flutter/auth_view.dart';
-
-// Example: use AuthScreen as your sign-in route widget
-AuthScreen(key: globalKey); // see package example/
+GoogleAuthConfig(
+  webClientId:         'YOUR_WEB_CLIENT_ID',       // required for web & as mobile fallback
+  androidClientId:     'YOUR_ANDROID_CLIENT_ID',   // optional
+  iosClientId:         'YOUR_IOS_CLIENT_ID',        // optional
+  desktopClientId:     'YOUR_DESKTOP_CLIENT_ID',
+  desktopClientSecret: 'YOUR_DESKTOP_SECRET',
+  desktopRedirectUri:  'http://localhost:8585/callback',
+)
 ```
 
-### 4. Or integrate programmatically
+#### Web setup
 
-Import the barrel file for the public API:
+1. Add both packages to your app's `pubspec.yaml`:
+
+```yaml
+dependencies:
+  google_sign_in: ^7.2.0
+  google_sign_in_web: ^1.1.3
+```
+
+2. Add the Google Identity Services script to `web/index.html` **before** `main.dart.js`:
+
+```html
+<head>
+  ...
+  <script src="https://accounts.google.com/gsi/client"></script>
+</head>
+```
+
+3. Create a **Web application** OAuth 2.0 client in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and add your app's origin to the allowed JavaScript origins (e.g. `http://localhost:PORT` for local dev).  Pass that client ID as `webClientId`.
+
+> **Note:** On web the `AuthBrowserLauncher` setting has no effect for Google — the plugin handles the OAuth popup internally.
+```
+
+### Microsoft
+
+Full OAuth 2.0 Authorization Code flow on all platforms via `AuthBrowserLauncher`.
 
 ```dart
-import 'package:uids_io_sdk_flutter/uids_io_sdk_flutter.dart';
+MicrosoftAuthConfig(
+  clientId:    'YOUR_AZURE_CLIENT_ID',
+  tenantId:    'common',            // or specific tenant GUID
+  redirectUri: 'http://localhost:9000/auth',  // desktop loopback
+  // redirectUri: 'msauth://com.example.app/callback', // mobile custom scheme
+)
 ```
 
-Use `loginWithCredentials`, `registerUser`, `GmailSSO`, `RefreshTokenService`, `AuthLogout`, etc., according to your flow.
+### GitHub
 
-### JSON conventions
-
-Request and response bodies align with **`AuthAPI`** TypeScript types (e.g. `LoginRequest` uses `email` + `password`; `POST /auth` body matches [`AuthRequest`](../AuthAPI/src/types/auth.ts): `accessToken`, `idpName`, optional `tokenType`; `/aud`, `/refresh`, `/registerDevice` match their DTOs). JSON uses camelCase (`token`, `refreshToken`, `entities`). Tenant rows in `entities[]` may still expose DB-style **`refresh_token`** alongside camelCase — the SDK parses both.
-
-## Platform notes
-
-- **Web / Google sign-in** – Recent `google_sign_in` versions use the Google Identity Services (GIS) button on web. The SDK shows a dialog with the official sign-in button when the user starts Google SSO; ensure your OAuth client and redirect URIs match your [Google Cloud Console](https://console.cloud.google.com/) setup.
-- **Desktop / Google** – Linux, macOS, and Windows use an embedded OAuth flow (`flutter_inappwebview`) toward your configured redirect URI.
-- **Host header** – Your auth server may resolve tenant/app config from the request `Host`. When testing locally, keep the host consistent with what your backend expects.
-
-## Logging
-
-Diagnostics use [`dart:developer` `log`](https://api.dart.dev/stable/dart-developer/log.html) with names like `uids_io_sdk_flutter.auth`, `uids_io_sdk_flutter.gmail`, `uids_io_sdk_flutter.token`, and `uids_io_sdk_flutter.device`. Routine traces (`sdkLogDebug` / `sdkLogInfo`) are **skipped in release** builds. Warnings and errors are logged in all builds. HTTP failures record a **safe summary** (method, URL, status, error type) via `dioErrorSummary`; request and response **bodies are not logged**, so tokens and passwords are not written to the console.
-
-## Exports
-
-The main library is `uids_io_sdk_flutter.dart`. It re-exports services, models, auth helpers, `Configuration`, and `gmail_sso.dart`. Import it once:
+OAuth 2.0 + PKCE on all platforms via `AuthBrowserLauncher`.
 
 ```dart
-import 'package:uids_io_sdk_flutter/uids_io_sdk_flutter.dart';
+GitHubAuthConfig(
+  clientId:     'YOUR_GITHUB_CLIENT_ID',
+  clientSecret: 'YOUR_GITHUB_CLIENT_SECRET',
+  redirectUri:  'http://localhost:9100/auth',        // desktop loopback
+  // redirectUri: 'com.example.app://auth/github',  // mobile custom scheme
+)
 ```
 
-## Example
+---
 
-See the [`example/`](example/) folder for a minimal app that uses `AuthScreen`.
+## Session management
 
-## Links
+```dart
+// Check sign-in state
+final signedIn = await sdk.isSignedIn();
 
-- **Repository:** [github.com/uids-io/sdk_flutter](https://github.com/uids-io/sdk_flutter)
-- **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
+// Get current session (null if not signed in)
+final session = await sdk.currentSession();
 
-## License
+// Get a valid (non-expired) session — refreshes automatically if needed
+final session = await sdk.getValidSession();
 
-See [LICENSE](LICENSE).
+// Get the raw access token
+final token = await sdk.accessToken();
+
+// Get Authorization header map
+final headers = await sdk.authHeaders();
+// → {'Authorization': 'Bearer <token>'}
+
+// Manual refresh
+await sdk.refreshSession(force: true);
+
+// Silent provider refresh (re-exchanges provider credential for a new session)
+await sdk.refreshProviderSession(provider: AuthProvider.microsoft);
+
+// Sign out (clears session, does not touch device state)
+await sdk.signOut();
+```
+
+### Reactive updates
+
+```dart
+sdk.sessionChanges.listen((session) {
+  // session is null when signed out
+});
+```
+
+---
+
+## Device registration
+
+Device registration is independent of authentication. Sign-in does not register a device; sign-out does not unregister one.
+
+```dart
+// Register (or retrieve cached) device
+final device = await sdk.ensureDeviceRegistered(
+  DeviceRegisterRequest(
+    stableDeviceKey: 'your-stable-device-uuid',
+    platform: 'android',
+  ),
+);
+
+// Update device metadata
+await sdk.updateDevice(DeviceUpdateRequest(pushToken: 'new-fcm-token'));
+
+// Unregister
+await sdk.unregisterDevice();
+```
+
+---
+
+## Architecture
+
+```
+UidsAuthSdk (public facade)
+ ├── AuthManager          → ProviderAuthAdapter → AuthBrowserLauncher
+ │                                                ├── ExternalBrowserLauncher (default)
+ │                                                └── InAppWebViewLauncher
+ ├── SessionManager       → AuthApiClient, SecureSdkStorage
+ └── DeviceManager        → AuthApiClient, SecureSdkStorage
+```
+
+- Adapters are UI-agnostic — they call the launcher and validate the returned URI.
+- The launcher decides how to open the auth URL and capture the callback.
+- Session and device flows are orthogonal; neither depends on the other.
+
+---
+
+## Error handling
+
+All SDK errors extend `UidsAuthException`:
+
+| Type | When |
+|---|---|
+| `UidsProviderCancelledException` | User cancelled the sign-in flow |
+| `UidsProviderSignInException` | Provider flow failed or timed out |
+| `UidsNetworkException` | HTTP failure talking to the backend |
+| `UidsSessionExpiredException` | Access token expired |
+| `UidsRefreshTokenExpiredException` | Refresh token revoked |
+| `UidsProviderNotConfiguredException` | Config missing for the requested provider |
+| `UidsNotInitializedException` | `initialize()` was not called first |
+
+```dart
+try {
+  final session = await sdk.signInWithProvider(provider: AuthProvider.github);
+} on UidsProviderCancelledException {
+  // user dismissed the dialog
+} on UidsProviderSignInException catch (e) {
+  print('Sign-in failed: $e');
+}
+```

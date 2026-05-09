@@ -1,5 +1,7 @@
 name: uids_io_sdk_flutter
-description: "A Flutter package to integrate  Single Sign-On (SSO) for Web, Android, iOS, and Desktop platforms"
+description: >
+  A reusable Flutter authentication SDK supporting Google, Microsoft, and
+  backend token exchange, session management, and device registration.
 version: 0.2.0
 homepage: https://github.com/uids-io/sdk_flutter.git
 repository: https://github.com/uids-io/sdk_flutter.git
@@ -11,56 +13,20 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  jwt_decoder: ^2.0.1
-  # shared_preferences: ^2.5.1
+
   flutter_secure_storage: ^10.0.0
+  http: ^1.2.0
   google_sign_in: ^7.2.0
-  dio: ^5.7.0
-  go_router: ^17.2.0
-  flutter_inappwebview: ^6.1.5
-  device_info_plus: ^12.4.0
   google_sign_in_web: ^1.1.3
-  
+  url_launcher: ^6.3.2
+  crypto: ^3.0.3
+  flutter_inappwebview: ^6.1.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  mocktail: ^1.0.4
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
 flutter:
-
-  # To add assets to your package, add an assets section, like this:
-  # assets:
-  #   - assets/images/google_icon.png
-  #   - assets/images/facebook_icon.png
-  #   - assets/images/github_icon.png
-  #
-  # For details regarding assets in packages, see
-  # https://flutter.dev/to/asset-from-package
-  #
-  # An image asset can refer to one or more resolution-specific "variants", see
-  # https://flutter.dev/to/resolution-aware-images
-
-  # To add custom fonts to your package, add a fonts section here,
-  # in this "flutter" section. Each entry in this list should have a
-  # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # For details regarding fonts in packages, see
-  # https://flutter.dev/to/font-from-package
+  # This is a pure-Dart SDK — no assets or fonts.
