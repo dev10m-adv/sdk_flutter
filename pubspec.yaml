@@ -20,7 +20,12 @@ dependencies:
   google_sign_in_web: ^1.1.3
   url_launcher: ^6.3.2
   crypto: ^3.0.3
-  flutter_inappwebview: ^6.1.5
+  # WebView
+  flutter_inappwebview:
+    git:
+      url: https://github.com/advforks/flutter_inappwebview
+      ref: master
+      path: flutter_inappwebview
 
 dev_dependencies:
   flutter_test:
