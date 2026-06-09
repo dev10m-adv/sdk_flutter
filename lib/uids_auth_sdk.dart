@@ -26,3 +26,7 @@ export 'src/models/device_models.dart';
 
 // Public SDK interface (includes factory UidsAuthSdk.create())
 export 'src/sdk/uids_auth_sdk_public.dart';
+
+// Storage — implement SdkStorage to supply a custom persistence layer
+export 'src/storage/sdk_storage.dart';
+export 'src/storage/secure_sdk_storage.dart';

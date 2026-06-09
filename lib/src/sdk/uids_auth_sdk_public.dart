@@ -2,6 +2,7 @@ import '../config/uids_sdk_config.dart';
 import '../models/auth_provider.dart';
 import '../models/auth_session.dart';
 import '../models/device_models.dart';
+import '../storage/sdk_storage.dart';
 import 'uids_auth_sdk_impl.dart';
 
 /// Public facade for the UIDS Auth SDK.
@@ -19,8 +20,13 @@ import 'uids_auth_sdk_impl.dart';
 /// Obtain an instance via [UidsAuthSdk.create] and call [initialize] before
 /// using any other method.
 abstract interface class UidsAuthSdk {
-  /// Creates a new SDK instance backed by platform secure storage.
-  factory UidsAuthSdk.create() => UidsAuthSdkImpl();
+  /// Creates a new SDK instance.
+  ///
+  /// Pass a custom [storage] implementation to replace the default
+  /// [SecureSdkStorage].  Omit it (or pass `null`) to keep the default
+  /// platform-secure storage behaviour.
+  factory UidsAuthSdk.create({SdkStorage? storage}) =>
+      UidsAuthSdkImpl(storage: storage);
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
