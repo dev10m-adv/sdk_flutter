@@ -23,6 +23,7 @@ export 'src/models/auth_provider.dart';
 export 'src/models/auth_session.dart';
 export 'src/models/auth_user.dart';
 export 'src/models/device_models.dart';
+export 'src/models/email_auth_models.dart';
 
 // Public SDK interface (includes factory UidsAuthSdk.create())
 export 'src/sdk/uids_auth_sdk_public.dart';
